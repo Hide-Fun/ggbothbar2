@@ -1,0 +1,28 @@
+---
+title: "README"
+format: gfm
+editor: visual
+dpi: 400
+bibliography: references.bib
+---
+
+## ggbotbar
+
+Create plot with geom_errorbar + geom_errorbarh with constant cap width.
+
+## Usage
+
+Load packages.
+
+```{r load_pkg, message=FALSE}
+library(tidyverse)
+library(ggbothbar)
+
+packageVersion("ggbothbar")
+```
+
+```{r demo, message=FALSE}
+library(ggplot2)
+ggplot(mtcars, aes(x = wt, y = mpg)) +
+  geom_errorbarb()
+```
