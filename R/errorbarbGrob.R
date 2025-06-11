@@ -4,7 +4,10 @@
 #'
 #' @param x A numeric or unit object specifying the x-coordinates of the error bars. Defaults to \code{unit(0, "npc")}
 #' @param y A numeric or unit object specifying the y-coordinates of the error bars. Defaults to \code{unit(0, "npc")}
-#' @param fun.errorbar A character string indicating the method to calculate the error bar. It can be either "sd" for standard deviation or "se" for standard error. Defaults to "sd"
+#' @param fun.errorbar A character string or function indicating how to
+#'   calculate the error bar. Character options are "sd" (standard deviation),
+#'   "se" (standard error) and "ci" (95\% confidence interval). A custom
+#'   function can also be supplied. Defaults to "sd".
 #' @param na.rm A logical value indicating whether NA values should be stripped before the computation proceeds. Defaults to FALSE
 #' @param errorbar_tip_size A unit object specifying the size of the error bar tips. Defaults to \code{unit(0.1, "npc")}
 #' @param default.units A character string indicating the default units to use if \code{x}, \code{y}, or \code{errorbar_tip_size} are not unit objects. Defaults to "npc"
@@ -72,25 +75,13 @@ makeContent.errorbarb <- function(grob) {
   fun.errorbar <- grob$fun.errorbar
   na.rm <- grob$na.rm
 
-  # summarise mean & sd or se
-  # calculate coordination
-  if (fun.errorbar == "sd") {
-    errorbarb <- create_errorbarb(
-      x = mean(x, na.rm = na.rm),
-      y = mean(y, na.rm = na.rm),
-      height = stats::sd(y, na.rm = na.rm),
-      width = stats::sd(x, na.rm = na.rm),
-      errorbar_tip_size = errorbar_tip_size
-    )
-  } else if (fun.errorbar == "se") {
-    errorbarb <- create_errorbarb(
-      x = mean(x, na.rm = na.rm),
-      y = mean(y, na.rm = na.rm),
-      height = se(y, na.rm = na.rm),
-      width = se(x, na.rm = na.rm),
-      errorbar_tip_size = errorbar_tip_size
-    )
-  }
+  errorbarb <- create_errorbarb(
+    x = mean(x, na.rm = na.rm),
+    y = mean(y, na.rm = na.rm),
+    height = calc_error(y, fun.errorbar = fun.errorbar, na.rm = na.rm),
+    width = calc_error(x, fun.errorbar = fun.errorbar, na.rm = na.rm),
+    errorbar_tip_size = errorbar_tip_size
+  )
 
   # Construct the grob
   errorbarb_line <- grid::segmentsGrob(

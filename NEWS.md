@@ -12,6 +12,7 @@
 - Added `delta` parameter to `calc_enrichment()` for flexible isotope column specification (#5)
 - Added `label_isotope()` for creating labels (e.g., axis title) of isotope plot.
 - Added `write_sheets()` for writting multiple data.frame into one Excel sheet / Google Spreadsheet.
+- Extended `calc_error()` with a 95% confidence interval option and support for custom functions.
 
 ## Improvements
 
