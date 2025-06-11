@@ -9,7 +9,7 @@ calc_error(x, fun.errorbar = "sd", na.rm = FALSE)
 \arguments{
 \item{x}{A numeric vector}
 
-\item{fun.errorbar}{A character string indicating the method to calculate the error bar. It can be either "sd" for standard deviation or "se" for standard error. Defaults to "sd"}
+\item{fun.errorbar}{A character string or function indicating how to calculate the error bar. Character options are "sd" (standard deviation), "se" (standard error) and "ci" (95\% confidence interval). A custom function can also be supplied. Defaults to "sd"}
 
 \item{na.rm}{A logical value indicating whether NA values should be stripped before the computation proceeds. Defaults to FALSE}
 }
@@ -17,9 +17,11 @@ calc_error(x, fun.errorbar = "sd", na.rm = FALSE)
 The calculated error bar (either standard deviation or standard error) of the input vector
 }
 \description{
-This function calculates either the standard deviation or the standard error of a numeric vector, depending on the specified method.
+This function calculates an error statistic for a numeric vector using the specified method.
 }
 \examples{
 calc_error(c(1, 2, 3, 4, 5))
 calc_error(c(1, 2, 3, 4, 5, NA), fun.errorbar = "se", na.rm = TRUE)
+calc_error(c(1, 2, 3, 4, 5), fun.errorbar = "ci")
+calc_error(c(1, 2, 3, 4, 5), fun.errorbar = function(z) max(z) - min(z))
 }

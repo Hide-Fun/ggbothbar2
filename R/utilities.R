@@ -23,18 +23,35 @@ se <- function(x, na.rm = FALSE) {
 #' This function calculates either the standard deviation or the standard error of a numeric vector, depending on the specified method.
 #'
 #' @param x A numeric vector
-#' @param fun.errorbar A character string indicating the method to calculate the error bar. It can be either "sd" for standard deviation or "se" for standard error. Defaults to "sd"
+#' @param fun.errorbar A character string or function indicating how to calculate
+#'   the error bar. Available character options are "sd" for standard deviation,
+#'   "se" for standard error, and "ci" for a 95\% confidence interval. A custom
+#'   function can also be supplied.
 #' @param na.rm A logical value indicating whether NA values should be stripped before the computation proceeds. Defaults to FALSE
-#' @return The calculated error bar (either standard deviation or standard error) of the input vector
+#' @return A numeric value representing the calculated error bar.
 #' @examples
 #' calc_error(c(1, 2, 3, 4, 5))
 #' calc_error(c(1, 2, 3, 4, 5, NA), fun.errorbar = "se", na.rm = TRUE)
+#' calc_error(c(1, 2, 3, 4, 5), fun.errorbar = "ci")
+#' calc_error(c(1, 2, 3, 4, 5), fun.errorbar = function(z) max(z) - min(z))
 #' @export
 calc_error <- function(x, fun.errorbar = "sd", na.rm = FALSE) {
-  if (fun.errorbar == "sd") {
-    stats::sd(x, na.rm = na.rm)
-  } else if (fun.errorbar == "se") {
-    se(x, na.rm = na.rm)
+  if (is.character(fun.errorbar)) {
+    if (fun.errorbar == "sd") {
+      stats::sd(x, na.rm = na.rm)
+    } else if (fun.errorbar == "se") {
+      se(x, na.rm = na.rm)
+    } else if (fun.errorbar == "ci") {
+      n <- sum(!is.na(x))
+      t_val <- stats::qt(0.975, df = n - 1)
+      t_val * se(x, na.rm = na.rm)
+    } else {
+      rlang::abort(paste0("Unsupported fun.errorbar: '", fun.errorbar, "'."))
+    }
+  } else if (is.function(fun.errorbar)) {
+    fun.errorbar(x)
+  } else {
+    rlang::abort("`fun.errorbar` must be either a character string or a function")
   }
 }
 

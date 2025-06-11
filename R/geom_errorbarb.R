@@ -7,7 +7,10 @@
 #' @param stat The statistical transformation to use on the data for this layer, as a string
 #' @param position Position adjustment, either as a string, or the result of a call to a position adjustment function
 #' @param ... Other arguments passed on to \code{layer()}. These are often aesthetics, used to set an aesthetic to a fixed value, like \code{colour = "red"} or \code{size = 3}. They may also be parameters to the paired geom/stat
-#' @param fun.errorbar A character string indicating the method to calculate the error bar. It can be either "sd" for standard deviation or "se" for standard error. Defaults to "sd"
+#' @param fun.errorbar A character string or function indicating how to
+#'   calculate the error bar. Character options are "sd" (standard deviation),
+#'   "se" (standard error) and "ci" (95\% confidence interval). A custom
+#'   function can also be supplied. Defaults to "sd".
 #' @param na.rm If \code{FALSE}, the default, removes missing values with a warning. If \code{TRUE} silently removes missing values
 #' @param errorbar_tip_size A numeric value specifying the size of the error bar tips in cm. Defaults to 2
 #' @param lineend Line end style (round, butt, square). Default is "butt"
