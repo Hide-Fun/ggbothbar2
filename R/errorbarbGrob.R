@@ -25,7 +25,7 @@
 #'   errorbar_tip_size = unit(5, "cm")
 #' )
 #' grid.draw(errorbar_grob)
-#' @export
+#' @noRd
 errorbarbGrob <- function(
   x = grid::unit(0, "npc"),
   y = grid::unit(0, "npc"),
@@ -69,8 +69,8 @@ errorbarbGrob <- function(
 #' @param x An object of class "errorbarb"
 #' @return A gTree object with the children set to the calculated error bars
 #' @importFrom grid makeContent
-#' @export makeContent.errorbarb
-#' @export
+#' @exportS3Method grid::makeContent
+#' @noRd
 makeContent.errorbarb <- function(x) {
   # Convert positions and physical tip sizes to one common absolute unit.
   coords_x <- grid::convertX(x$x, "mm", valueOnly = TRUE)
@@ -145,7 +145,7 @@ makeContent.errorbarb <- function(x) {
 #' @examples
 #' errorbar_coords <- create_errorbarb(0.5, 0.5, 0.1, 0.05, 0.02)
 #' print(errorbar_coords)
-#' @export
+#' @noRd
 create_errorbarb <- function(x, y, height, width, errorbar_tip_size) {
   values <- c(x, y, height, width, errorbar_tip_size)
   if (!is.numeric(values) || any(!is.finite(values))) {

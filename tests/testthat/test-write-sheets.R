@@ -20,10 +20,69 @@ test_that("write_sheets forwards explicit local overwrite policy", {
   expect_false(result)
 })
 
-test_that("write_sheets warns while overwrite remains implicit", {
+test_that("write_sheets protects local output by default", {
   local_mocked_bindings(
     assert_dependencies = function(local, download) NULL,
     write_local_excel = function(..., overwrite) overwrite,
+    .package = "ggbothbar"
+  )
+
+  result <- write_sheets(
+    sheet_fixture(),
+    sheet_names = "data",
+    name = "example",
+    local = TRUE
+  )
+
+  expect_false(result)
+  expect_identical(formals(write_sheets)$overwrite, FALSE)
+})
+
+test_that("missing optional dependencies give classed installation guidance", {
+  condition <- rlang::catch_cnd(
+    ggbothbar:::abort_missing_dependencies(
+      c("googlesheets4", "googledrive")
+    )
+  )
+
+  expect_s3_class(condition, "ggbothbar_missing_dependency")
+  expect_equal(
+    condition$missing_packages,
+    c("googlesheets4", "googledrive")
+  )
+  expect_match(conditionMessage(condition), "googlesheets4, googledrive")
+  expect_match(conditionMessage(condition), "install.packages")
+})
+
+test_that("sheet dependencies follow the selected output path", {
+  cases <- data.frame(
+    local = c(FALSE, FALSE, TRUE, TRUE),
+    download = c(FALSE, TRUE, FALSE, TRUE)
+  )
+  expected <- list(
+    "googlesheets4",
+    c("googlesheets4", "googledrive"),
+    "openxlsx",
+    "openxlsx"
+  )
+
+  observed <- Map(
+    ggbothbar:::required_sheet_packages,
+    cases$local,
+    cases$download
+  )
+
+  expect_identical(observed, expected)
+})
+
+test_that("local output takes precedence over the download flag", {
+  observed <- new.env(parent = emptyenv())
+  local_mocked_bindings(
+    assert_dependencies = function(local, download) {
+      observed$packages <- ggbothbar:::required_sheet_packages(local, download)
+    },
+    write_local_excel = function(...) "local-output",
+    write_google_sheets = function(...) stop("Google output must not be used"),
     .package = "ggbothbar"
   )
 
@@ -32,12 +91,28 @@ test_that("write_sheets warns while overwrite remains implicit", {
       sheet_fixture(),
       sheet_names = "data",
       name = "example",
-      local = TRUE
+      local = TRUE,
+      download = TRUE
     ),
-    class = "ggbothbar_overwrite_warning"
+    "save locally without using Google Sheets",
+    fixed = TRUE
   )
 
-  expect_true(result)
+  expect_identical(observed$packages, "openxlsx")
+  expect_identical(result, "local-output")
+})
+
+test_that("write_sheets rejects the removed NULL overwrite state", {
+  expect_error(
+    write_sheets(
+      sheet_fixture(),
+      sheet_names = "data",
+      name = "example",
+      local = TRUE,
+      overwrite = NULL
+    ),
+    class = "ggbothbar_input_error"
+  )
 })
 
 test_that("local xlsx output refuses an existing file when requested", {

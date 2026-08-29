@@ -1,7 +1,7 @@
 Package: ggbothbar
 Type: Package
 Title: Visualise Isotopic Abundance Data
-Version: 1.1.2
+Version: 1.2.0
 Authors@R: c(
     person("Hidehito", "Okada", , "hidefungi@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-3210-2736"))
@@ -18,18 +18,18 @@ Roxygen: list(markdown = TRUE)
 VignetteBuilder: knitr
 Depends:
     ggplot2 (>= 3.5.0),
-    R (>= 3.5.0)
+    R (>= 4.1.0)
 Imports: 
     dplyr (>= 1.0.0),
-    googlesheets4 (>= 1.0.0),
-    googledrive (>= 2.0.0),
     purrr (>= 0.3.4),
     rlang (>= 0.4.11)
 Suggests:
-    openxlsx (>= 4.2.5),
-    testthat (>= 3.1.7),
-    vdiffr (>= 1.0.0),
+    googledrive (>= 2.0.0),
+    googlesheets4 (>= 1.0.0),
     knitr (>= 1.30),
-    rmarkdown (>= 2.5)
+    openxlsx (>= 4.2.5),
+    rmarkdown (>= 2.5),
+    testthat (>= 3.1.7),
+    vdiffr (>= 1.0.0)
 Config/roxygen2/version: 8.0.0
 Config/testthat/edition: 3

@@ -1,3 +1,40 @@
+# ggbothbar 1.2.0
+
+## Breaking changes
+
+- The minimum supported R version is now 4.1.
+- `Geomerrorbarb`, `errorbarbGrob`, `create_errorbarb`, and
+  `makeContent.errorbarb` are no longer exported. These rendering backends are
+  internal implementation details; use `geom_errorbarb()` for plots. The grid
+  S3 method remains registered for internal grob dispatch.
+- `write_sheets()` now defaults to `overwrite = FALSE`. The transitional
+  `overwrite = NULL` state from 1.1.2 is no longer accepted; use an explicit
+  `TRUE` to replace an existing local or downloaded xlsx file.
+
+## Dependency and I/O boundaries
+
+- `googlesheets4` and `googledrive` moved from Imports to Suggests. Google
+  Sheets remains the default destination. When a selected Google workflow is
+  unavailable, `write_sheets()` raises a `ggbothbar_missing_dependency` error
+  that names the missing packages and shows an installation command; it never
+  installs packages or silently changes the destination.
+- `local = TRUE` takes precedence when `download = TRUE` is also supplied, so
+  this path requires only `openxlsx` and performs no Google operation.
+
+## Structure and presentation
+
+- Split calculation, label, plotting-helper, validation, and spreadsheet I/O
+  responsibilities into focused source files. Public spreadsheet calls now
+  pass through validation before reaching local or Google side-effect
+  adapters.
+- Isolated ggplot2 panel-range and coordinate handling behind an internal
+  compatibility adapter, and separated the shared two-axis summary logic from
+  its Stat and Geom implementations without changing validated summaries.
+- `theme_aca()` and its compatibility alias `theme_isotope()` no longer discard
+  mapped legends. Other theme settings are unchanged.
+- Added focused behavioral, API-surface, dependency-routing, and mapped-legend
+  regressions for the structural release.
+
 # ggbothbar 1.1.2
 
 ## Bug fixes

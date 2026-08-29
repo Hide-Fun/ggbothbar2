@@ -145,7 +145,7 @@ test_that("geom_errorbox computes transformed summaries in data space", {
 
 test_that("errorbar tips preserve their physical centimeter size", {
   with_temp_pdf_device({
-    grob <- errorbarbGrob(
+    grob <- ggbothbar:::errorbarbGrob(
       x = grid::unit(c(0.4, 0.6), "npc"),
       y = grid::unit(c(0.4, 0.6), "npc"),
       errorbar_tip_size = grid::unit(0.18, "cm")

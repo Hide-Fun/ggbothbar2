@@ -123,7 +123,7 @@ draw_errorbarb_row <- function(data, errorbar_tip_size, lineend) {
 #' @format NULL
 #' @usage NULL
 #' @family ggplot2 geoms
-#' @export
+#' @noRd
 Geomerrorbarb <- ggplot2::ggproto(
   "Geomerrorbarb",
   ggplot2::Geom,
