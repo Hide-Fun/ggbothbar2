@@ -1,179 +1,40 @@
-#' Align axis scales of multiple ggplot objects
+#' Align axis scales across ggplot objects
 #'
-#' Ensures consistent axis limits and break intervals across multiple ggplot
-#' objects. This is useful when comparing plots side-by-side or combining them
-#' using packages such as `patchwork`, `gridExtra`, or `cowplot`.
+#' `align_axis_scales()` gives multiple plots common visible ranges and break
+#' positions while retaining each plot's supported scale transformation and
+#' coordinate semantics. Continuous log scales and [ggplot2::coord_flip()] are
+#' preserved.
 #'
-#' This function separates two concepts:
-#' - The visible plotting range is controlled by `x_limits` / `y_limits`
-#'   (applied via `coord_*()` as `xlim` / `ylim`).
-#' - The scale padding is controlled by `expand`, which is passed to
-#'   `scale_x_continuous(expand = ...)` and `scale_y_continuous(expand = ...)`.
+#' Free-scale facets and unsupported coordinate systems use a documented
+#' best-effort fallback. The function emits a structured
+#' `ggbothbar_axis_fallback_warning` before returning those plots because a
+#' fallback may change facet or coordinate meaning.
 #'
-#' Only continuous axes can be aligned. If an axis requested via `axes`
-#' is discrete (factor / character) in any of the plots, the function stops
-#' with an informative error rather than partially modifying the scales.
-#' In that case, convert the scale to numeric first or remove the axis
-#' from `axes`.
+#' @param plots A list containing at least two ggplot objects.
+#' @param axes Axes to align: `"x"`, `"y"`, or `c("x", "y")`.
+#' @param x_break_step,y_break_step Positive finite break spacing in the
+#'   original data space.
+#' @param x_limits,y_limits Optional visible limits. Supply one finite number or
+#'   `c(min, max)` in the original data space.
+#' @param aspect_ratio Optional positive finite aspect-ratio multiplier.
+#' @param clip Clipping mode passed to the coordinate system: `"on"`, `"off"`,
+#'   or `"inherit"`.
+#' @param expand_breaks If `TRUE`, extend each upper limit until its span is an
+#'   integer multiple of the corresponding break step.
+#' @param expand Expansion specification applied to adjusted continuous scales.
 #'
-#' `align_axis_scales()` returns a list of ggplot objects in the same order
-#' they were supplied. Each plot receives a shared `scale_*_continuous()`
-#' plus either `coord_cartesian()` or `coord_fixed()` (if `aspect_ratio`
-#' is set) so that the visible range, break spacing, and expansion are
-#' consistent across the collection.
-#' When `expand_breaks = TRUE`, the upper bound of each continuous span is
-#' increased just enough so that `(max - min)` becomes an exact multiple of the
-#' relevant break step, yielding "clean" tick positions while keeping padding
-#' control in `expand`.
-#'
-#' @param plots A list of ggplot objects (length >= 2).
-#' @param axes Character vector specifying which axes to align. Must be any
-#'   combination of `"x"` and/or `"y"`. For example:
-#'   - `"x"`      to align only the x-axis
-#'   - `"y"`      to align only the y-axis
-#'   - `c("x","y")` to align both axes.
-#'   Default: `c("x","y")`.
-#' @param x_break_step Numeric. Step size for x-axis breaks (default: 3).
-#' @param y_break_step Numeric. Step size for y-axis breaks (default: 3).
-#' @param x_limits Optional numeric vector. x-axis visible limits, either
-#'   `c(min, max)` or a single number. These are ultimately enforced via
-#'   `coord_*()` and therefore define the displayed range.
-#' @param y_limits Optional numeric vector. y-axis visible limits, either
-#'   `c(min, max)` or a single number.
-#' @param aspect_ratio Optional numeric. If specified, enforces a fixed aspect
-#'   ratio by calling `coord_fixed()`. The ratio is scaled by the observed
-#'   x/y spans.
-#' @param clip Character. Passed to `coord_*()`. One of `"on"`, `"off"`,
-#'   or `"inherit"` (default: `"off"`).
-#' @param expand_breaks Logical. If `TRUE`, the max axis values are extended so
-#'   that the span becomes an exact multiple of the break step. This ONLY
-#'   affects the computed limits (xlim/ylim). It does NOT change `expand`.
-#' @param expand Expansion specification passed to both `scale_x_continuous()`
-#'   and `scale_y_continuous()` as their `expand` argument. For example,
-#'   `expansion(mult = 0)` removes padding; `waiver()` uses ggplot2 defaults.
-#'   Default: `waiver()`.
-#'
-#' @return A list of ggplot objects with aligned axis scales (same length and
-#'   order as the input `plots` list).
-#'
+#' @return A list of adjusted ggplot objects in input order.
 #' @examples
 #' library(ggplot2)
-#' library(patchwork)
+#' first <- ggplot(subset(mtcars, cyl == 4), aes(wt, mpg)) + geom_point()
+#' second <- ggplot(subset(mtcars, cyl == 6), aes(wt, mpg)) + geom_point()
 #'
-#' # Example data
-#' df4 <- subset(mtcars, cyl == 4)
-#' df6 <- subset(mtcars, cyl == 6)
-#'
-#' p4 <- ggplot(df4, aes(wt, mpg)) +
-#'   geom_point(color = "steelblue") +
-#'   labs(title = "4 cylinders")
-#'
-#' p6 <- ggplot(df6, aes(wt, mpg)) +
-#'   geom_point(color = "firebrick") +
-#'   labs(title = "6 cylinders")
-#'
-#' ##
-#' ## 1. Align both x and y (default behavior)
-#' ##
-#' aligned_both <- align_axis_scales(
-#'   plots = list(p4, p6),
-#'   axes = c("x", "y")  # align both axes
-#' )
-#'
-#' # Both plots now share the same break positions and coord x/y ranges.
-#' aligned_both[[1]] + aligned_both[[2]]
-#'
-#'
-#' ##
-#' ## 2. Control visible range with x_limits / y_limits
-#' ##
-#' # Here we *force* x to be from 2 to 5, regardless of each plot's data.
-#' # y_limits is left NULL, so it comes from the data range.
-#' #
-#' # IMPORTANT:
-#' #   The break sequence for x (seq(xmin, xmax, by = x_break_step))
-#' #   is built from these merged limits.
-#'
-#' aligned_forced_x <- align_axis_scales(
-#'   plots = list(p4, p6),
-#'   axes = "x",
-#'   x_limits = c(2, 5),
-#'   x_break_step = 0.5
-#' )
-#'
-#' # -> x axis will show ticks at 2.0, 2.5, 3.0, ..., 5.0,
-#' #    and coord_cartesian(xlim = c(2, 5)) is applied to both.
-#' aligned_forced_x[[1]] + aligned_forced_x[[2]]
-#'
-#'
-#' ##
-#' ## 3. expand_breaks = TRUE "rounds up" the max to a clean multiple
-#' ##
-#' # Suppose combined x-range of p4/p6 is about [1.5, 4.2].
-#' # With x_break_step = 1, the raw span is about 2.7.
-#' # 2.7 is *not* a multiple of 1, so we bump the upper bound
-#' # up to 4.5 (or 5, depending on rounding),
-#' # so that the final span is an exact multiple of 1.
-#' #
-#' # This gives "clean" tick marks like 1, 2, 3, 4, 5.
-#'
-#' aligned_rounded <- align_axis_scales(
-#'   plots = list(p4, p6),
-#'   axes = "x",
-#'   x_break_step = 1,
-#'   expand_breaks = TRUE
-#' )
-#'
-#' aligned_rounded[[1]] + aligned_rounded[[2]]
-#'
-#'
-#' ##
-#' ## 4. expand controls the visual padding at plot edges
-#' ##
-#' # Case A: default padding (expand = waiver()).
-#' #   ggplot2 usually adds ~5% space beyond the extreme values.
-#'
-#' aligned_default_pad <- align_axis_scales(
-#'   plots = list(p4, p6),
+#' aligned <- align_axis_scales(
+#'   list(first, second),
 #'   axes = c("x", "y"),
 #'   x_break_step = 0.5,
-#'   y_break_step = 5,
-#'   expand = waiver()     # keep ggplot2 default padding
+#'   y_break_step = 5
 #' )
-#'
-#' # Case B: no padding at all (expand = expansion(mult = 0)).
-#' #   The axes start *exactly* at the computed limits, i.e.,
-#' #   the panel border touches the first/last break.
-#'
-#' aligned_no_pad <- align_axis_scales(
-#'   plots = list(p4, p6),
-#'   axes = c("x", "y"),
-#'   x_break_step = 0.5,
-#'   y_break_step = 5,
-#'   expand = expansion(mult = 0)
-#' )
-#'
-#' # Compare visually:
-#' #   aligned_default_pad[[1]] vs aligned_no_pad[[1]]
-#'
-#'
-#' ##
-#' ## 5. Aspect ratio locking
-#' ##
-#' # aspect_ratio = 1 tries to make "1 unit of x equals 1 unit of y"
-#' # after accounting for data ranges. This is useful for scatterplots
-#' # where true geometric angles/distances matter.
-#'
-#' aligned_fixed_ratio <- align_axis_scales(
-#'   plots = list(p4, p6),
-#'   axes = c("x", "y"),
-#'   x_break_step = 0.5,
-#'   y_break_step = 5,
-#'   aspect_ratio = 1
-#' )
-#'
-#' aligned_fixed_ratio[[1]] + aligned_fixed_ratio[[2]]
-#'
 #' @export
 align_axis_scales <- function(
   plots,
@@ -185,403 +46,141 @@ align_axis_scales <- function(
   aspect_ratio = NULL,
   clip = "off",
   expand_breaks = FALSE,
-  expand = waiver()
+  expand = ggplot2::waiver()
 ) {
-  # validate axes -----------------------------------------------------------
   axes <- match.arg(axes, choices = c("x", "y"), several.ok = TRUE)
-
-  # basic checks ------------------------------------------------------------
-  if (!is.list(plots) || length(plots) < 2) {
-    stop("`plots` must be a list with at least two ggplot objects.")
+  validate_axis_options(
+    x_break_step = x_break_step,
+    y_break_step = y_break_step,
+    x_limits = x_limits,
+    y_limits = y_limits,
+    aspect_ratio = aspect_ratio,
+    clip = clip,
+    expand_breaks = expand_breaks
+  )
+  if (!is.list(plots) || length(plots) < 2L) {
+    rlang::abort(
+      "`plots` must be a list containing at least two ggplot objects.",
+      class = "ggbothbar_input_error"
+    )
   }
   if (!all(vapply(plots, inherits, logical(1), "gg"))) {
-    stop("All elements of `plots` must be ggplot objects.")
+    rlang::abort(
+      "Every element of `plots` must be a ggplot object.",
+      class = "ggbothbar_input_error"
+    )
   }
 
+  builds <- lapply(plots, ggplot2::ggplot_build)
+  x_info <- Map(axis_info, plots, builds, MoreArgs = list(axis = "x"))
+  y_info <- Map(axis_info, plots, builds, MoreArgs = list(axis = "y"))
   adjust_x <- "x" %in% axes
   adjust_y <- "y" %in% axes
 
-  # Build plots once --------------------------------------------------------
-  builds <- lapply(plots, ggplot_build)
-
-  # We'll compute aligned ranges only for axes we adjust.
-  # For aspect_ratio we may still need spans of the non-adjusted axis,
-  # so we will keep a reference to the first plot's limits.
-
-  # x-axis handling ---------------------------------------------------------
-  if (adjust_x) {
-    x_limits_all <- unlist(lapply(builds, get_lim, ax = "x"), use.names = FALSE)
-
-    if (!is.numeric(x_limits_all)) {
-      stop(
-        "`axes` includes 'x', but at least one plot has a discrete x scale. ",
-        "Currently align_axis_scales() only supports continuous x when aligning x."
-      )
-    }
-
-    xmin <- floor(min(x_limits_all, na.rm = TRUE))
-    xmax <- ceiling(max(x_limits_all, na.rm = TRUE))
-
-    x_new <- merge_lim(xmin, xmax, x_limits)
-    xmin <- x_new[1]
-    xmax <- x_new[2]
-
-    if (expand_breaks) {
-      x_span <- xmax - xmin
-      x_rem <- x_span %% x_break_step
-      if (!isTRUE(all.equal(x_rem, 0))) {
-        xmax <- xmax + (x_break_step - x_rem)
-      }
-    }
-  } else {
-    # not aligning x
-    xmin <- xmax <- NULL
-    # but we still want reference limits for aspect_ratio
-    x_limits_first <- get_lim(builds[[1]], "x")
-  }
-
-  # y-axis handling ---------------------------------------------------------
-  if (adjust_y) {
-    y_limits_all <- unlist(lapply(builds, get_lim, ax = "y"), use.names = FALSE)
-
-    if (!is.numeric(y_limits_all)) {
-      stop(
-        "`axes` includes 'y', but at least one plot has a discrete y scale. ",
-        "Currently align_axis_scales() only supports continuous y when aligning y."
-      )
-    }
-
-    ymin <- floor(min(y_limits_all, na.rm = TRUE))
-    ymax <- ceiling(max(y_limits_all, na.rm = TRUE))
-
-    y_new <- merge_lim(ymin, ymax, y_limits)
-    ymin <- y_new[1]
-    ymax <- y_new[2]
-
-    if (expand_breaks) {
-      y_span <- ymax - ymin
-      y_rem <- y_span %% y_break_step
-      if (!isTRUE(all.equal(y_rem, 0))) {
-        ymax <- ymax + (y_break_step - y_rem)
-      }
-    }
-  } else {
-    # not aligning y
-    ymin <- ymax <- NULL
-    # reference limits for aspect_ratio
-    y_limits_first <- get_lim(builds[[1]], "y")
-  }
-
-  # construct shared scales -------------------------------------------------
-  shared_scales <- list()
-
-  if (adjust_x) {
-    shared_scales <- c(
-      shared_scales,
-      scale_x_continuous(
-        breaks = seq(xmin, xmax, by = x_break_step),
-        expand = expand
-      )
+  if (adjust_x && !all(vapply(x_info, `[[`, logical(1), "continuous"))) {
+    rlang::abort(
+      "All x scales must be continuous when `axes` includes \"x\".",
+      class = "ggbothbar_input_error"
     )
   }
-  if (adjust_y) {
-    shared_scales <- c(
-      shared_scales,
-      scale_y_continuous(
-        breaks = seq(ymin, ymax, by = y_break_step),
-        expand = expand
-      )
+  if (adjust_y && !all(vapply(y_info, `[[`, logical(1), "continuous"))) {
+    rlang::abort(
+      "All y scales must be continuous when `axes` includes \"y\".",
+      class = "ggbothbar_input_error"
     )
   }
 
-  # coordinate system with visible limits -----------------------------------
-  coord_args <- list(clip = clip)
-  if (adjust_x) {
-    coord_args$xlim <- c(xmin, xmax)
+  for (index in seq_along(plots)) {
+    reasons <- axis_fallback_reasons(
+      plots[[index]],
+      axes = axes,
+      aspect_ratio = aspect_ratio
+    )
+    warn_axis_fallback(reasons, plot_index = index)
   }
-  if (adjust_y) {
-    coord_args$ylim <- c(ymin, ymax)
-  }
+  warn_mixed_transformations(x_info, adjust_x, "x")
+  warn_mixed_transformations(y_info, adjust_y, "y")
 
-  # aspect_ratio handling ---------------------------------------------------
-  coord_obj <- if (is.null(aspect_ratio)) {
-    do.call(coord_cartesian, coord_args)
+  x_range <- if (adjust_x) {
+    compute_axis_range(
+      unlist(lapply(x_info, `[[`, "limits"), use.names = FALSE),
+      user_limits = x_limits,
+      break_step = x_break_step,
+      expand_breaks = expand_breaks,
+      axis = "x"
+    )
   } else {
-    # We need spans for x and y. We may NOT have aligned an axis,
-    # so fall back to the first plot's build for that axis.
-    #
-    # x info:
-    if (adjust_x) {
-      x_span_ratio <- axis_span_for_ratio(
-        is_num = TRUE, # we stopped() earlier if not numeric
-        final_min = xmin,
-        final_max = xmax,
-        lims_all = NULL
-      )
+    NULL
+  }
+  y_range <- if (adjust_y) {
+    compute_axis_range(
+      unlist(lapply(y_info, `[[`, "limits"), use.names = FALSE),
+      user_limits = y_limits,
+      break_step = y_break_step,
+      expand_breaks = expand_breaks,
+      axis = "y"
+    )
+  } else {
+    NULL
+  }
+
+  ratio <- if (is.null(aspect_ratio)) {
+    NULL
+  } else {
+    x_span <- if (adjust_x) {
+      diff(x_range$limits)
     } else {
-      x_all_first <- x_limits_first
-      x_is_num_first <- is.numeric(x_all_first)
-
-      if (x_is_num_first) {
-        # use the raw numeric span from first plot
-        x_rng <- range(x_all_first, na.rm = TRUE)
-        x_span_tmp <- abs(diff(x_rng))
-        if (x_span_tmp == 0) {
-          x_span_tmp <- 1
-        }
-        x_span_ratio <- x_span_tmp
-      } else {
-        # treat discrete levels as 1,2,3,...
-        x_span_ratio <- axis_span_for_ratio(
-          is_num = FALSE,
-          final_min = NA_real_,
-          final_max = NA_real_,
-          lims_all = x_all_first
-        )
-      }
+      axis_span(x_info[[1]])
     }
-
-    # y info:
-    if (adjust_y) {
-      y_span_ratio <- axis_span_for_ratio(
-        is_num = TRUE, # we stopped() earlier if not numeric
-        final_min = ymin,
-        final_max = ymax,
-        lims_all = NULL
-      )
+    y_span <- if (adjust_y) {
+      diff(y_range$limits)
     } else {
-      y_all_first <- y_limits_first
-      y_is_num_first <- is.numeric(y_all_first)
-
-      if (y_is_num_first) {
-        y_rng <- range(y_all_first, na.rm = TRUE)
-        y_span_tmp <- abs(diff(y_rng))
-        if (y_span_tmp == 0) {
-          y_span_tmp <- 1
-        }
-        y_span_ratio <- y_span_tmp
-      } else {
-        y_span_ratio <- axis_span_for_ratio(
-          is_num = FALSE,
-          final_min = NA_real_,
-          final_max = NA_real_,
-          lims_all = y_all_first
-        )
-      }
+      axis_span(y_info[[1]])
     }
-
-    ratio_val <- (x_span_ratio / y_span_ratio) * aspect_ratio
-
-    do.call(coord_fixed, c(coord_args, list(ratio = ratio_val)))
+    (x_span / y_span) * aspect_ratio
   }
 
-  shared_scales <- c(shared_scales, coord_obj)
-
-  # apply shared components to every plot -----------------------------------
-  lapply(plots, `+`, shared_scales)
+  Map(
+    function(plot, x_axis, y_axis) {
+      apply_axis_adjustment(
+        plot,
+        x_info = x_axis,
+        y_info = y_axis,
+        x_range = x_range,
+        y_range = y_range,
+        ratio = ratio,
+        clip = clip,
+        expand = expand
+      )
+    },
+    plots,
+    x_info,
+    y_info
+  )
 }
 
-
-#' @keywords internal
-merge_lim <- function(auto_min, auto_max, user_lim) {
-  # Merge automatic range with user-supplied limit spec.
-  if (is.null(user_lim)) {
-    return(c(auto_min, auto_max))
-  }
-  if (!is.numeric(user_lim)) {
-    warning("Limits must be numeric. Using automatic limits.")
-    return(c(auto_min, auto_max))
-  }
-  if (length(user_lim) == 2) {
-    return(user_lim)
-  }
-  if (length(user_lim) == 1) {
-    if (user_lim <= auto_min) {
-      return(c(user_lim, auto_max))
-    }
-    if (user_lim >= auto_max) {
-      return(c(auto_min, user_lim))
-    }
-    return(c(user_lim, auto_max))
-  }
-  warning("Use a scalar or c(min, max). Using automatic limits.")
-  c(auto_min, auto_max)
-}
-
-#' @keywords internal
-get_lim <- function(b, ax) {
-  b$layout$panel_params[[1]][[ax]]$limits
-}
-
-#' Adjust axis scales of a single ggplot object
+#' Adjust axis scales on one ggplot object
 #'
-#' Adjusts axis scales of a single ggplot object with user-specified break
-#' steps, limits, expansion, and aspect ratio. This is a single-plot analogue
-#' of `align_axis_scales()`.
+#' `adjust_axis_scales()` changes visible ranges, break spacing, expansion, and
+#' an optional aspect ratio while preserving supported scale transformations
+#' and coordinate systems. Continuous log scales and [ggplot2::coord_flip()]
+#' are preserved.
 #'
-#' The function treats each axis independently and is careful about discrete
-#' vs continuous axes:
-#'
-#' * If an axis is continuous (numeric), it will:
-#'   - derive an automatic range from the data,
-#'   - merge that with any user-supplied `*_limits`,
-#'   - optionally "round up" the max via `expand_breaks = TRUE` so that
-#'     the final span is an exact multiple of `*_break_step`,
-#'   - generate breaks with `seq(min, max, by = *_break_step)`,
-#'   - apply `scale_*_continuous(expand = expand)`,
-#'   - enforce visible range via `coord_cartesian()` / `coord_fixed()`.
-#'
-#' * If an axis is discrete (factor / character), that axis is LEFT UNTOUCHED:
-#'   - we do not call `floor()` / `ceiling()` on it,
-#'   - we do not add `scale_*_continuous()` for it,
-#'   - we do not set `xlim` / `ylim` for that axis in `coord_*()`.
-#'   If you pass `x_limits` or `y_limits` for a discrete axis, they will be
-#'   ignored with a warning.
-#'
-#' Separation of concerns:
-#'
-#' * `x_limits`, `y_limits` (merged with automatic data ranges) define the
-#'   *visible* numeric range, via `coord_cartesian(xlim=..., ylim=...)`
-#'   or `coord_fixed()`.
-#'
-#' * `expand` controls padding at the panel edges by being passed to
-#'   `scale_x_continuous(expand = ...)` / `scale_y_continuous(expand = ...)`.
-#'   This is visual gap, not data range.
-#'
-#' * `expand_breaks = TRUE` can slightly extend the computed max range so that
-#'   the span is an exact multiple of `x_break_step` / `y_break_step`.
-#'   This makes tick marks "clean" (e.g. 10, 15, 20, 25, 30). It only applies
-#'   to continuous axes.
+#' Free-scale facets and unsupported coordinates return a warned best-effort
+#' fallback. The warning has class `ggbothbar_axis_fallback_warning`.
 #'
 #' @param plot A ggplot object.
-#' @param x_break_step Numeric. Step size for x-axis breaks (default: 3).
-#' @param y_break_step Numeric. Step size for y-axis breaks (default: 3).
-#' @param x_limits Optional numeric vector. x-axis visible limits, either
-#'   `c(min, max)` or a single number. Only used if x is continuous.
-#' @param y_limits Optional numeric vector. y-axis visible limits, either
-#'   `c(min, max)` or a single number. Only used if y is continuous.
-#' @param aspect_ratio Optional numeric. If specified, enforces a fixed aspect
-#'   ratio via `coord_fixed()`. If one axis is discrete, the ratio is computed
-#'   using the available continuous axis and a fallback of 1 for the discrete
-#'   axis; a warning is issued.
-#' @param clip Character. Passed to `coord_*()`. One of `"on"`, `"off"`,
-#'   or `"inherit"` (default: `"off"`).
-#' @param expand_breaks Logical. If `TRUE`, adjusts the computed max (and
-#'   therefore the break sequence and coord limits) so the span is an exact
-#'   multiple of the break step. Only applies to continuous axes.
-#' @param expand Expansion specification for `scale_x_continuous()` and
-#'   `scale_y_continuous()`. Typical values:
-#'   - `waiver()` (default): ggplot2 default ~5% padding.
-#'   - `expansion(mult = 0)`: no padding at panel edges.
-#'   - `expansion(add = c(0, 2))`: add fixed headroom on the high end, etc.
+#' @inheritParams align_axis_scales
 #'
-#' @return A ggplot object with adjusted axis scales.
-#'
+#' @return An adjusted ggplot object.
 #' @examples
 #' library(ggplot2)
-#'
-#' # A scatterplot (both axes continuous) ------------------------------------
-#' p <- ggplot(mtcars, aes(wt, mpg)) +
-#'   geom_point() +
-#'   labs(title = "Miles per Gallon vs Weight")
-#'
-#' # 1. Basic usage with custom breaks
-#' p_basic <- adjust_axis_scales(
-#'   plot = p,
+#' plot <- ggplot(mtcars, aes(wt, mpg)) + geom_point()
+#' adjust_axis_scales(
+#'   plot,
 #'   x_break_step = 0.5,
 #'   y_break_step = 5
 #' )
-#' p_basic
-#'
-#' # 2. Force visible ranges using x_limits / y_limits
-#' #    Breaks are then seq(min, max, by = step) within those forced limits.
-#' p_forced_limits <- adjust_axis_scales(
-#'   plot = p,
-#'   x_limits = c(2, 5),
-#'   y_limits = c(10, 35),
-#'   x_break_step = 0.5,
-#'   y_break_step = 5
-#' )
-#' p_forced_limits
-#'
-#' # 3. Make tick spacing "pretty" with expand_breaks = TRUE
-#' #    The function will round up the max so the span is a clean multiple
-#' #    of the break step (continuous axes only).
-#' p_pretty_ticks <- adjust_axis_scales(
-#'   plot = p,
-#'   x_break_step = 1,
-#'   y_break_step = 5,
-#'   expand_breaks = TRUE
-#' )
-#' p_pretty_ticks
-#'
-#' # 4. Control panel padding with `expand`
-#' #    (A) default padding (~5%), (B) none at all, (C) extra headroom.
-#' p_default_pad <- adjust_axis_scales(
-#'   plot = p,
-#'   x_break_step = 0.5,
-#'   y_break_step = 5,
-#'   expand = waiver()
-#' )
-#'
-#' p_no_pad <- adjust_axis_scales(
-#'   plot = p,
-#'   x_break_step = 0.5,
-#'   y_break_step = 5,
-#'   expand = expansion(mult = 0)
-#' )
-#'
-#' p_headroom <- adjust_axis_scales(
-#'   plot = p,
-#'   x_break_step = 0.5,
-#'   y_break_step = 5,
-#'   expand = expansion(add = c(0, 2))  # +2 on the high end of y
-#' )
-#'
-#' # 5. Lock aspect ratio so that 1 unit of x ~ 1 unit of y visually
-#' p_fixed_ratio <- adjust_axis_scales(
-#'   plot = p,
-#'   x_break_step = 0.5,
-#'   y_break_step = 5,
-#'   aspect_ratio = 1
-#' )
-#' p_fixed_ratio
-#'
-#'
-#' # Boxplot example (discrete x, continuous y) ------------------------------
-#' p_box <- ggplot(mtcars, aes(x = factor(cyl), y = mpg)) +
-#'   geom_boxplot(fill = "gray70") +
-#'   labs(
-#'     title = "MPG by cylinder count",
-#'     x = "cyl",
-#'     y = "mpg"
-#'   )
-#'
-#' # 6. For boxplots, x is discrete. We only adjust y.
-#' #    - y_limits fixes visible mpg range.
-#' #    - y_break_step controls tick spacing.
-#' #    - expand_breaks = TRUE rounds up the top to a clean multiple of 5.
-#' #    - expand = expansion(mult = 0) removes top/bottom padding so boxes
-#' #      sit flush against the panel border.
-#' p_box_forced <- adjust_axis_scales(
-#'   plot = p_box,
-#'   y_limits = c(10, 35),
-#'   y_break_step = 5,
-#'   expand_breaks = TRUE,
-#'   expand = expansion(mult = 0)
-#' )
-#' p_box_forced
-#'
-#' # 7. Add headroom above the whiskers for annotations without changing
-#' #    the discrete x. We just pad y using `expand = expansion(add = c(0, 2))`.
-#' p_box_headroom <- adjust_axis_scales(
-#'   plot = p_box,
-#'   y_limits = c(10, 35),
-#'   y_break_step = 5,
-#'   expand = expansion(add = c(0, 2))
-#' )
-#' p_box_headroom
-#'
 #' @export
 adjust_axis_scales <- function(
   plot,
@@ -592,145 +191,452 @@ adjust_axis_scales <- function(
   aspect_ratio = NULL,
   clip = "off",
   expand_breaks = FALSE,
-  expand = waiver()
+  expand = ggplot2::waiver()
 ) {
-  # Validate input -----------------------------------------------------------
   if (!inherits(plot, "gg")) {
-    stop("`plot` must be a ggplot object.")
+    rlang::abort("`plot` must be a ggplot object.", class = "ggbothbar_input_error")
+  }
+  validate_axis_options(
+    x_break_step = x_break_step,
+    y_break_step = y_break_step,
+    x_limits = x_limits,
+    y_limits = y_limits,
+    aspect_ratio = aspect_ratio,
+    clip = clip,
+    expand_breaks = expand_breaks
+  )
+
+  build <- ggplot2::ggplot_build(plot)
+  x_info <- axis_info(plot, build, "x")
+  y_info <- axis_info(plot, build, "y")
+  adjusted_axes <- character()
+  if (x_info$continuous) {
+    adjusted_axes <- c(adjusted_axes, "x")
+  } else if (!is.null(x_limits)) {
+    rlang::warn(
+      "The x scale is discrete; `x_limits` will be ignored.",
+      class = "ggbothbar_axis_fallback_warning"
+    )
+  }
+  if (y_info$continuous) {
+    adjusted_axes <- c(adjusted_axes, "y")
+  } else if (!is.null(y_limits)) {
+    rlang::warn(
+      "The y scale is discrete; `y_limits` will be ignored.",
+      class = "ggbothbar_axis_fallback_warning"
+    )
   }
 
-  # Build plot to extract original limits -----------------------------------
-  build <- ggplot_build(plot)
-  x_limits_all <- get_lim(build, "x")
-  y_limits_all <- get_lim(build, "y")
+  reasons <- axis_fallback_reasons(
+    plot,
+    axes = adjusted_axes,
+    aspect_ratio = aspect_ratio
+  )
+  warn_axis_fallback(reasons)
 
-  x_is_num <- is.numeric(x_limits_all)
-  y_is_num <- is.numeric(y_limits_all)
+  x_range <- if (x_info$continuous) {
+    compute_axis_range(
+      x_info$limits,
+      user_limits = x_limits,
+      break_step = x_break_step,
+      expand_breaks = expand_breaks,
+      axis = "x"
+    )
+  } else {
+    NULL
+  }
+  y_range <- if (y_info$continuous) {
+    compute_axis_range(
+      y_info$limits,
+      user_limits = y_limits,
+      break_step = y_break_step,
+      expand_breaks = expand_breaks,
+      axis = "y"
+    )
+  } else {
+    NULL
+  }
 
-  # x-axis calculations (only if continuous) --------------------------------
-  if (x_is_num) {
-    xmin <- floor(min(x_limits_all, na.rm = TRUE))
-    xmax <- ceiling(max(x_limits_all, na.rm = TRUE))
+  ratio <- if (is.null(aspect_ratio)) {
+    NULL
+  } else {
+    x_span <- if (is.null(x_range)) axis_span(x_info) else diff(x_range$limits)
+    y_span <- if (is.null(y_range)) axis_span(y_info) else diff(y_range$limits)
+    (x_span / y_span) * aspect_ratio
+  }
 
-    x_new <- merge_lim(xmin, xmax, x_limits)
-    xmin <- x_new[1]
-    xmax <- x_new[2]
+  apply_axis_adjustment(
+    plot,
+    x_info = x_info,
+    y_info = y_info,
+    x_range = x_range,
+    y_range = y_range,
+    ratio = ratio,
+    clip = clip,
+    expand = expand
+  )
+}
 
-    if (expand_breaks) {
-      x_span <- xmax - xmin
-      x_rem <- x_span %% x_break_step
-      if (!isTRUE(all.equal(x_rem, 0))) {
-        xmax <- xmax + (x_break_step - x_rem)
-      }
+validate_axis_options <- function(
+  x_break_step,
+  y_break_step,
+  x_limits,
+  y_limits,
+  aspect_ratio,
+  clip,
+  expand_breaks
+) {
+  validate_break_step(x_break_step, "x_break_step")
+  validate_break_step(y_break_step, "y_break_step")
+  validate_user_limits(x_limits, "x_limits")
+  validate_user_limits(y_limits, "y_limits")
+  if (
+    !is.null(aspect_ratio) &&
+      (!is.numeric(aspect_ratio) ||
+        length(aspect_ratio) != 1L ||
+        !is.finite(aspect_ratio) ||
+        aspect_ratio <= 0)
+  ) {
+    rlang::abort(
+      "`aspect_ratio` must be NULL or one positive finite number.",
+      class = "ggbothbar_input_error"
+    )
+  }
+  if (
+    !is.character(clip) ||
+      length(clip) != 1L ||
+      is.na(clip) ||
+      !clip %in% c("on", "off", "inherit")
+  ) {
+    rlang::abort(
+      "`clip` must be one of \"on\", \"off\", or \"inherit\".",
+      class = "ggbothbar_input_error"
+    )
+  }
+  if (
+    !is.logical(expand_breaks) ||
+      length(expand_breaks) != 1L ||
+      is.na(expand_breaks)
+  ) {
+    rlang::abort(
+      "`expand_breaks` must be a single non-missing logical value.",
+      class = "ggbothbar_input_error"
+    )
+  }
+}
+
+validate_break_step <- function(value, argument) {
+  if (
+    !is.numeric(value) ||
+      length(value) != 1L ||
+      !is.finite(value) ||
+      value <= 0
+  ) {
+    rlang::abort(
+      paste0("`", argument, "` must be one positive finite number."),
+      class = "ggbothbar_input_error"
+    )
+  }
+}
+
+validate_user_limits <- function(value, argument) {
+  if (is.null(value)) {
+    return(invisible(NULL))
+  }
+  if (
+    !is.numeric(value) ||
+      !length(value) %in% c(1L, 2L) ||
+      any(!is.finite(value))
+  ) {
+    rlang::abort(
+      paste0("`", argument, "` must contain one or two finite numbers."),
+      class = "ggbothbar_input_error"
+    )
+  }
+  if (length(value) == 2L && value[[1]] >= value[[2]]) {
+    rlang::abort(
+      paste0("`", argument, "` must be ordered as c(min, max)."),
+      class = "ggbothbar_input_error"
+    )
+  }
+}
+
+axis_info <- function(plot, build, axis) {
+  transformed_limits <- get_lim(build, axis)
+  scale <- plot$scales$get_scales(axis)
+  trained_scales <- if (axis == "x") {
+    build$layout$panel_scales_x
+  } else {
+    build$layout$panel_scales_y
+  }
+  trained_scale <- trained_scales[[1]]
+  transform <- trained_scale$trans
+
+  if (is.numeric(transformed_limits)) {
+    limits <- if (is.null(transform) || is.null(transform$inverse)) {
+      transformed_limits
+    } else {
+      transform$inverse(transformed_limits)
+    }
+    continuous <- is.numeric(limits)
+  } else {
+    limits <- transformed_limits
+    continuous <- FALSE
+  }
+
+  list(
+    axis = axis,
+    limits = limits,
+    continuous = continuous,
+    scale = scale,
+    trained_scale = trained_scale,
+    transform_name = if (is.null(transform$name)) "identity" else transform$name
+  )
+}
+
+compute_axis_range <- function(
+  values,
+  user_limits,
+  break_step,
+  expand_breaks,
+  axis
+) {
+  values <- values[is.finite(values)]
+  if (length(values) == 0L) {
+    rlang::abort(
+      paste0("The ", axis, " scale has no finite values to align."),
+      class = "ggbothbar_input_error"
+    )
+  }
+
+  lower <- floor(min(values))
+  upper <- ceiling(max(values))
+  limits <- merge_lim(lower, upper, user_limits)
+  lower <- limits[[1]]
+  upper <- limits[[2]]
+  if (upper == lower) {
+    upper <- lower + break_step
+  }
+
+  if (expand_breaks) {
+    remainder <- (upper - lower) %% break_step
+    if (!isTRUE(all.equal(remainder, 0))) {
+      upper <- upper + break_step - remainder
+    }
+  }
+
+  list(
+    limits = c(lower, upper),
+    breaks = seq(lower, upper, by = break_step)
+  )
+}
+
+apply_axis_adjustment <- function(
+  plot,
+  x_info,
+  y_info,
+  x_range,
+  y_range,
+  ratio,
+  clip,
+  expand
+) {
+  adjusted <- plot
+  if (!is.null(x_range)) {
+    adjusted <- adjusted + clone_axis_scale(
+      x_info,
+      breaks = x_range$breaks,
+      expand = expand
+    )
+  }
+  if (!is.null(y_range)) {
+    adjusted <- adjusted + clone_axis_scale(
+      y_info,
+      breaks = y_range$breaks,
+      expand = expand
+    )
+  }
+
+  adjusted$coordinates <- adjusted_coordinate(
+    plot$coordinates,
+    x_limits = if (is.null(x_range)) NULL else x_range$limits,
+    y_limits = if (is.null(y_range)) NULL else y_range$limits,
+    ratio = ratio,
+    clip = clip
+  )
+  adjusted
+}
+
+clone_axis_scale <- function(info, breaks, expand) {
+  if (is.null(info$scale)) {
+    if (info$axis == "x") {
+      return(ggplot2::scale_x_continuous(breaks = breaks, expand = expand))
+    }
+    return(ggplot2::scale_y_continuous(breaks = breaks, expand = expand))
+  }
+
+  scale <- info$scale$clone()
+  scale$breaks <- breaks
+  if (!inherits(expand, "waiver")) {
+    scale$expand <- expand
+  }
+  scale
+}
+
+adjusted_coordinate <- function(coord, x_limits, y_limits, ratio, clip) {
+  supported <- inherits(coord, "CoordCartesian") ||
+    inherits(coord, "CoordFixed") ||
+    inherits(coord, "CoordFlip")
+
+  if (!supported) {
+    args <- list(xlim = x_limits, ylim = y_limits, clip = clip)
+    if (is.null(ratio)) {
+      return(do.call(ggplot2::coord_cartesian, args))
+    }
+    return(do.call(ggplot2::coord_fixed, c(args, list(ratio = ratio))))
+  }
+
+  if (!is.null(ratio) && !inherits(coord, "CoordFlip")) {
+    if (inherits(coord, "CoordFixed")) {
+      result <- ggplot2::ggproto(NULL, coord)
+      result$ratio <- ratio
+    } else {
+      result <- ggplot2::coord_fixed(
+        ratio = ratio,
+        xlim = x_limits,
+        ylim = y_limits,
+        expand = coord$expand,
+        clip = clip
+      )
+      return(result)
     }
   } else {
-    xmin <- xmax <- NULL
-    if (!is.null(x_limits)) {
-      warning("x axis appears to be discrete; ignoring `x_limits`.")
+    result <- ggplot2::ggproto(NULL, coord)
+  }
+
+  if (is.null(result$limits)) {
+    result$limits <- list(x = NULL, y = NULL)
+  }
+  if (!is.null(x_limits)) {
+    result$limits$x <- x_limits
+  }
+  if (!is.null(y_limits)) {
+    result$limits$y <- y_limits
+  }
+  result$clip <- clip
+  result
+}
+
+axis_fallback_reasons <- function(plot, axes, aspect_ratio) {
+  reasons <- character()
+  free <- plot$facet$params$free
+  if (!is.null(free)) {
+    if ("x" %in% axes && isTRUE(free$x)) {
+      reasons <- c(
+        reasons,
+        "the x facet scale is free and will receive a shared best-effort range"
+      )
+    }
+    if ("y" %in% axes && isTRUE(free$y)) {
+      reasons <- c(
+        reasons,
+        "the y facet scale is free and will receive a shared best-effort range"
+      )
     }
   }
 
-  # y-axis calculations (only if continuous) --------------------------------
-  if (y_is_num) {
-    ymin <- floor(min(y_limits_all, na.rm = TRUE))
-    ymax <- ceiling(max(y_limits_all, na.rm = TRUE))
-
-    y_new <- merge_lim(ymin, ymax, y_limits)
-    ymin <- y_new[1]
-    ymax <- y_new[2]
-
-    if (expand_breaks) {
-      y_span <- ymax - ymin
-      y_rem <- y_span %% y_break_step
-      if (!isTRUE(all.equal(y_rem, 0))) {
-        ymax <- ymax + (y_break_step - y_rem)
-      }
-    }
-  } else {
-    ymin <- ymax <- NULL
-    if (!is.null(y_limits)) {
-      warning("y axis appears to be discrete; ignoring `y_limits`.")
-    }
-  }
-
-  # Scales with custom breaks and expansion ---------------------------------
-  shared_scales <- list()
-
-  if (x_is_num) {
-    shared_scales <- c(
-      shared_scales,
-      scale_x_continuous(
-        breaks = seq(xmin, xmax, by = x_break_step),
-        expand = expand
+  coord <- plot$coordinates
+  supported <- inherits(coord, "CoordCartesian") ||
+    inherits(coord, "CoordFixed") ||
+    inherits(coord, "CoordFlip")
+  if (!supported) {
+    reasons <- c(
+      reasons,
+      paste0(
+        "coordinate class ",
+        class(coord)[[1]],
+        " is unsupported and will fall back to Cartesian coordinates"
       )
     )
   }
-
-  if (y_is_num) {
-    shared_scales <- c(
-      shared_scales,
-      scale_y_continuous(
-        breaks = seq(ymin, ymax, by = y_break_step),
-        expand = expand
-      )
+  if (!is.null(aspect_ratio) && inherits(coord, "CoordFlip")) {
+    reasons <- c(
+      reasons,
+      "`aspect_ratio` cannot be imposed without replacing `coord_flip()` and will be ignored"
     )
   }
+  reasons
+}
 
-  # Coordinate system with visible limits -----------------------------------
-  coord_args <- list(clip = clip)
-
-  if (x_is_num) {
-    coord_args$xlim <- c(xmin, xmax)
+warn_axis_fallback <- function(reasons, plot_index = NULL) {
+  if (length(reasons) == 0L) {
+    return(invisible(NULL))
   }
-  if (y_is_num) {
-    coord_args$ylim <- c(ymin, ymax)
-  }
+  target <- if (is.null(plot_index)) "The plot" else paste0("Plot ", plot_index)
+  details <- stats::setNames(reasons, rep("i", length(reasons)))
+  rlang::warn(
+    c(
+      paste0(target, " requires a best-effort axis fallback."),
+      details
+    ),
+    class = "ggbothbar_axis_fallback_warning"
+  )
+}
 
-  # aspect_ratio handling ---------------------------------------------------
-  coord_obj <- if (is.null(aspect_ratio)) {
-    do.call(coord_cartesian, coord_args)
+warn_mixed_transformations <- function(info, adjusted, axis) {
+  if (!adjusted) {
+    return(invisible(NULL))
+  }
+  transformations <- unique(vapply(info, `[[`, character(1), "transform_name"))
+  if (length(transformations) > 1L) {
+    rlang::warn(
+      c(
+        paste0("The ", axis, " scales use different transformations."),
+        i = "Each transformation is preserved, so visual spacing may not align."
+      ),
+      class = "ggbothbar_axis_fallback_warning"
+    )
+  }
+}
+
+axis_span <- function(info) {
+  if (info$continuous) {
+    span <- diff(range(info$limits, na.rm = TRUE))
   } else {
-    # Compute span for x and y, using numeric range if continuous,
-    # or factor->as.numeric() if discrete.
-    x_span_ratio <- axis_span_for_ratio(
-      is_num = x_is_num,
-      final_min = if (x_is_num) xmin else NA_real_,
-      final_max = if (x_is_num) xmax else NA_real_,
-      lims_all = x_limits_all
-    )
-
-    y_span_ratio <- axis_span_for_ratio(
-      is_num = y_is_num,
-      final_min = if (y_is_num) ymin else NA_real_,
-      final_max = if (y_is_num) ymax else NA_real_,
-      lims_all = y_limits_all
-    )
-
-    ratio_val <- (x_span_ratio / y_span_ratio) * aspect_ratio
-
-    do.call(coord_fixed, c(coord_args, list(ratio = ratio_val)))
+    span <- length(unique(info$limits)) - 1
   }
-
-  shared_scales <- c(shared_scales, coord_obj)
-
-  plot + shared_scales
+  if (!is.finite(span) || span <= 0) 1 else span
 }
 
 #' @keywords internal
-axis_span_for_ratio <- function(is_num, final_min, final_max, lims_all) {
-  if (is_num) {
-    span <- abs(final_max - final_min)
-    if (span == 0) {
-      span <- 1
-    }
-    return(span)
-  } else {
-    lev_num <- as.numeric(factor(lims_all, levels = unique(lims_all)))
-    rng <- range(lev_num, na.rm = TRUE)
-    span <- abs(rng[2] - rng[1]) + 0.6 * 2
-    if (span == 0) {
-      span <- 1
-    }
-    return(span)
+merge_lim <- function(auto_min, auto_max, user_lim) {
+  if (is.null(user_lim)) {
+    return(c(auto_min, auto_max))
   }
+  if (length(user_lim) == 2L) {
+    return(user_lim)
+  }
+  if (user_lim <= auto_min) {
+    return(c(user_lim, auto_max))
+  }
+  if (user_lim >= auto_max) {
+    return(c(auto_min, user_lim))
+  }
+  c(user_lim, auto_max)
+}
+
+#' @keywords internal
+get_lim <- function(build, axis) {
+  panel_scales <- if (axis == "x") {
+    build$layout$panel_scales_x
+  } else {
+    build$layout$panel_scales_y
+  }
+  unlist(
+    lapply(
+      panel_scales,
+      function(scale) scale$get_limits()
+    ),
+    use.names = FALSE
+  )
 }

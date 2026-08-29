@@ -2,7 +2,7 @@
 % Please edit documentation in R/align_scales.R
 \name{align_axis_scales}
 \alias{align_axis_scales}
-\title{Align axis scales of multiple ggplot objects}
+\title{Align axis scales across ggplot objects}
 \usage{
 align_axis_scales(
   plots,
@@ -14,198 +14,54 @@ align_axis_scales(
   aspect_ratio = NULL,
   clip = "off",
   expand_breaks = FALSE,
-  expand = waiver()
+  expand = ggplot2::waiver()
 )
 }
 \arguments{
-\item{plots}{A list of ggplot objects (length >= 2).}
+\item{plots}{A list containing at least two ggplot objects.}
 
-\item{axes}{Character vector specifying which axes to align. Must be any
-combination of \code{"x"} and/or \code{"y"}. For example:
-\itemize{
-\item \code{"x"}      to align only the x-axis
-\item \code{"y"}      to align only the y-axis
-\item \code{c("x","y")} to align both axes.
-Default: \code{c("x","y")}.
-}}
+\item{axes}{Axes to align: \code{"x"}, \code{"y"}, or \code{c("x", "y")}.}
 
-\item{x_break_step}{Numeric. Step size for x-axis breaks (default: 3).}
+\item{x_break_step, y_break_step}{Positive finite break spacing in the
+original data space.}
 
-\item{y_break_step}{Numeric. Step size for y-axis breaks (default: 3).}
+\item{x_limits, y_limits}{Optional visible limits. Supply one finite number or
+\code{c(min, max)} in the original data space.}
 
-\item{x_limits}{Optional numeric vector. x-axis visible limits, either
-\code{c(min, max)} or a single number. These are ultimately enforced via
-\verb{coord_*()} and therefore define the displayed range.}
+\item{aspect_ratio}{Optional positive finite aspect-ratio multiplier.}
 
-\item{y_limits}{Optional numeric vector. y-axis visible limits, either
-\code{c(min, max)} or a single number.}
+\item{clip}{Clipping mode passed to the coordinate system: \code{"on"}, \code{"off"},
+or \code{"inherit"}.}
 
-\item{aspect_ratio}{Optional numeric. If specified, enforces a fixed aspect
-ratio by calling \code{coord_fixed()}. The ratio is scaled by the observed
-x/y spans.}
+\item{expand_breaks}{If \code{TRUE}, extend each upper limit until its span is an
+integer multiple of the corresponding break step.}
 
-\item{clip}{Character. Passed to \verb{coord_*()}. One of \code{"on"}, \code{"off"},
-or \code{"inherit"} (default: \code{"off"}).}
-
-\item{expand_breaks}{Logical. If \code{TRUE}, the max axis values are extended so
-that the span becomes an exact multiple of the break step. This ONLY
-affects the computed limits (xlim/ylim). It does NOT change \code{expand}.}
-
-\item{expand}{Expansion specification passed to both \code{scale_x_continuous()}
-and \code{scale_y_continuous()} as their \code{expand} argument. For example,
-\code{expansion(mult = 0)} removes padding; \code{waiver()} uses ggplot2 defaults.
-Default: \code{waiver()}.}
+\item{expand}{Expansion specification applied to adjusted continuous scales.}
 }
 \value{
-A list of ggplot objects with aligned axis scales (same length and
-order as the input \code{plots} list).
+A list of adjusted ggplot objects in input order.
 }
 \description{
-Ensures consistent axis limits and break intervals across multiple ggplot
-objects. This is useful when comparing plots side-by-side or combining them
-using packages such as \code{patchwork}, \code{gridExtra}, or \code{cowplot}.
+\code{align_axis_scales()} gives multiple plots common visible ranges and break
+positions while retaining each plot's supported scale transformation and
+coordinate semantics. Continuous log scales and \code{\link[ggplot2:coord_flip]{ggplot2::coord_flip()}} are
+preserved.
 }
 \details{
-This function separates two concepts:
-\itemize{
-\item The visible plotting range is controlled by \code{x_limits} / \code{y_limits}
-(applied via \verb{coord_*()} as \code{xlim} / \code{ylim}).
-\item The scale padding is controlled by \code{expand}, which is passed to
-\code{scale_x_continuous(expand = ...)} and \code{scale_y_continuous(expand = ...)}.
-}
-
-Only continuous axes can be aligned. If an axis requested via \code{axes}
-is discrete (factor / character) in any of the plots, the function stops
-with an informative error rather than partially modifying the scales.
-In that case, convert the scale to numeric first or remove the axis
-from \code{axes}.
-
-\code{align_axis_scales()} returns a list of ggplot objects in the same order
-they were supplied. Each plot receives a shared \verb{scale_*_continuous()}
-plus either \code{coord_cartesian()} or \code{coord_fixed()} (if \code{aspect_ratio}
-is set) so that the visible range, break spacing, and expansion are
-consistent across the collection.
-When \code{expand_breaks = TRUE}, the upper bound of each continuous span is
-increased just enough so that \code{(max - min)} becomes an exact multiple of the
-relevant break step, yielding "clean" tick positions while keeping padding
-control in \code{expand}.
+Free-scale facets and unsupported coordinate systems use a documented
+best-effort fallback. The function emits a structured
+\code{ggbothbar_axis_fallback_warning} before returning those plots because a
+fallback may change facet or coordinate meaning.
 }
 \examples{
 library(ggplot2)
-library(patchwork)
+first <- ggplot(subset(mtcars, cyl == 4), aes(wt, mpg)) + geom_point()
+second <- ggplot(subset(mtcars, cyl == 6), aes(wt, mpg)) + geom_point()
 
-# Example data
-df4 <- subset(mtcars, cyl == 4)
-df6 <- subset(mtcars, cyl == 6)
-
-p4 <- ggplot(df4, aes(wt, mpg)) +
-  geom_point(color = "steelblue") +
-  labs(title = "4 cylinders")
-
-p6 <- ggplot(df6, aes(wt, mpg)) +
-  geom_point(color = "firebrick") +
-  labs(title = "6 cylinders")
-
-##
-## 1. Align both x and y (default behavior)
-##
-aligned_both <- align_axis_scales(
-  plots = list(p4, p6),
-  axes = c("x", "y")  # align both axes
-)
-
-# Both plots now share the same break positions and coord x/y ranges.
-aligned_both[[1]] + aligned_both[[2]]
-
-
-##
-## 2. Control visible range with x_limits / y_limits
-##
-# Here we *force* x to be from 2 to 5, regardless of each plot's data.
-# y_limits is left NULL, so it comes from the data range.
-#
-# IMPORTANT:
-#   The break sequence for x (seq(xmin, xmax, by = x_break_step))
-#   is built from these merged limits.
-
-aligned_forced_x <- align_axis_scales(
-  plots = list(p4, p6),
-  axes = "x",
-  x_limits = c(2, 5),
-  x_break_step = 0.5
-)
-
-# -> x axis will show ticks at 2.0, 2.5, 3.0, ..., 5.0,
-#    and coord_cartesian(xlim = c(2, 5)) is applied to both.
-aligned_forced_x[[1]] + aligned_forced_x[[2]]
-
-
-##
-## 3. expand_breaks = TRUE "rounds up" the max to a clean multiple
-##
-# Suppose combined x-range of p4/p6 is about [1.5, 4.2].
-# With x_break_step = 1, the raw span is about 2.7.
-# 2.7 is *not* a multiple of 1, so we bump the upper bound
-# up to 4.5 (or 5, depending on rounding),
-# so that the final span is an exact multiple of 1.
-#
-# This gives "clean" tick marks like 1, 2, 3, 4, 5.
-
-aligned_rounded <- align_axis_scales(
-  plots = list(p4, p6),
-  axes = "x",
-  x_break_step = 1,
-  expand_breaks = TRUE
-)
-
-aligned_rounded[[1]] + aligned_rounded[[2]]
-
-
-##
-## 4. expand controls the visual padding at plot edges
-##
-# Case A: default padding (expand = waiver()).
-#   ggplot2 usually adds ~5\% space beyond the extreme values.
-
-aligned_default_pad <- align_axis_scales(
-  plots = list(p4, p6),
+aligned <- align_axis_scales(
+  list(first, second),
   axes = c("x", "y"),
   x_break_step = 0.5,
-  y_break_step = 5,
-  expand = waiver()     # keep ggplot2 default padding
+  y_break_step = 5
 )
-
-# Case B: no padding at all (expand = expansion(mult = 0)).
-#   The axes start *exactly* at the computed limits, i.e.,
-#   the panel border touches the first/last break.
-
-aligned_no_pad <- align_axis_scales(
-  plots = list(p4, p6),
-  axes = c("x", "y"),
-  x_break_step = 0.5,
-  y_break_step = 5,
-  expand = expansion(mult = 0)
-)
-
-# Compare visually:
-#   aligned_default_pad[[1]] vs aligned_no_pad[[1]]
-
-
-##
-## 5. Aspect ratio locking
-##
-# aspect_ratio = 1 tries to make "1 unit of x equals 1 unit of y"
-# after accounting for data ranges. This is useful for scatterplots
-# where true geometric angles/distances matter.
-
-aligned_fixed_ratio <- align_axis_scales(
-  plots = list(p4, p6),
-  axes = c("x", "y"),
-  x_break_step = 0.5,
-  y_break_step = 5,
-  aspect_ratio = 1
-)
-
-aligned_fixed_ratio[[1]] + aligned_fixed_ratio[[2]]
-
 }
