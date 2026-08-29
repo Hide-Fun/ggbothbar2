@@ -94,3 +94,33 @@ ggplot() +
   labs(x = label_isotope(13, "C", "epsilon"), y = label_isotope(15, "N", "epsilon")) +
   theme_aca(base_family = "sans")
 ```
+
+## Spreadsheet output
+
+Google Sheets remains the default destination. Its client packages are optional
+in ggbothbar 1.2.0, so install them only when that workflow is needed.
+
+```{r spreadsheet-google, eval=FALSE}
+install.packages(c("googlesheets4", "googledrive"))
+
+write_sheets(
+  list(summary = iso_enriched),
+  sheet_names = "summary",
+  name = "isotope-summary"
+)
+```
+
+Local xlsx output requires `openxlsx` and protects an existing destination by
+default. Replacement must be explicit.
+
+```{r spreadsheet-local, eval=FALSE}
+install.packages("openxlsx")
+
+write_sheets(
+  list(summary = iso_enriched),
+  sheet_names = "summary",
+  name = "isotope-summary",
+  local = TRUE,
+  overwrite = FALSE
+)
+```

@@ -39,7 +39,7 @@ Dependency order:
 `documentation and package check` → `1.1.2 candidate` → `structural changes` →
 `1.2.0 candidate`
 
-### Implementation status (2026-08-29)
+### Implementation status (2026-08-30)
 
 - The 1.1.2 repair candidate is implemented on `fix/1.1.2`, including the
   regression suite, CI workflow, metadata, README, and English vignette.
@@ -50,7 +50,14 @@ Dependency order:
   closure, tag, push, and release publication remain execution-time release
   steps. They have not been run because external publication was not
   authorised.
-- Work on 1.2.0 has not started.
+- Work on 1.2.0 is in progress on `refactor/1.2.0`. Source responsibilities
+  have been split, the ggplot2 compatibility boundary and Stat/Geom summary
+  boundary are in place, Google clients are optional, the overwrite default and
+  backend export surface have been revised, and mapped legends are retained.
+- Focused regressions for moved public helpers, dependency routing, API exports,
+  and theme aliases pass locally. The remaining release work is clean
+  build/check validation, an installation test without Google clients, CI
+  matrix execution, and final documentation regeneration.
 
 ## Milestone 1.1.2 — repair release
 

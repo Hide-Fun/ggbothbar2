@@ -15,7 +15,7 @@ library(ggbothbar)
 packageVersion("ggbothbar")
 ```
 
-    [1] '1.1.2'
+    [1] '1.2.0'
 
 ``` r
 library(ggplot2)
@@ -101,3 +101,34 @@ ggplot() +
 ```
 
 ![](README_files/figure-commonmark/iso-box-1.png)
+
+## Spreadsheet output
+
+Google Sheets remains the default destination. Its client packages are
+optional in ggbothbar 1.2.0, so install them only when that workflow is
+needed.
+
+``` r
+install.packages(c("googlesheets4", "googledrive"))
+
+write_sheets(
+  list(summary = iso_enriched),
+  sheet_names = "summary",
+  name = "isotope-summary"
+)
+```
+
+Local xlsx output requires `openxlsx` and protects an existing
+destination by default. Replacement must be explicit.
+
+``` r
+install.packages("openxlsx")
+
+write_sheets(
+  list(summary = iso_enriched),
+  sheet_names = "summary",
+  name = "isotope-summary",
+  local = TRUE,
+  overwrite = FALSE
+)
+```
