@@ -4,7 +4,7 @@
 \alias{Geomerrorbarb}
 \title{Geomerrorbarb ggproto object}
 \description{
-Internal ggproto backing \code{geom_errorbarb()}. Most users should call
-\code{geom_errorbarb()} directly rather than constructing this object manually.
+Internal ggproto backing \code{\link[=geom_errorbarb]{geom_errorbarb()}}. Most users should call
+\code{geom_errorbarb()} directly.
 }
 \concept{ggplot2 geoms}

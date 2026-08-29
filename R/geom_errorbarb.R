@@ -1,40 +1,60 @@
-#' Geom for Error Bars (Both x & y axis) with Custom Tips
+#' Geom for two-axis error bars with fixed physical tips
 #'
-#' This function creates a custom ggplot2 geom for drawing error bars with specified error calculation methods and tip sizes.
+#' `geom_errorbarb()` summarizes each group in the original data space and
+#' draws uncertainty intervals along both x and y. Use `stat = "identity"`
+#' with precomputed `xmin`, `xmax`, `ymin`, and `ymax` aesthetics.
 #'
-#' @param mapping Set of aesthetic mappings created by \code{aes()} or \code{aes_()}. If specified and \code{inherit.aes = TRUE} (the default), it is combined with the default mapping at the top level of the plot. You must supply \code{mapping} if there is no plot mapping
-#' @param data The data to be displayed in this layer. There are three options: If \code{NULL}, the default, the data is inherited from the plot data as specified in the call to \code{ggplot()}. A \code{data.frame}, or other object, will override the plot data. All objects will be fortified to produce a data frame. See \code{fortify()} for which variables will be created. A \code{function} will be called with a single argument, the plot data. The return value must be a \code{data.frame}, and will be used as the layer data
-#' @param stat The statistical transformation to use on the data for this layer, as a string
-#' @param position Position adjustment, either as a string, or the result of a call to a position adjustment function
-#' @param ... Other arguments passed on to \code{layer()}. These are often aesthetics, used to set an aesthetic to a fixed value, like \code{colour = "red"} or \code{size = 3}. They may also be parameters to the paired geom/stat
-#' @param fun.errorbar A character string indicating the method to calculate the error bar. It can be either "sd" for standard deviation or "se" for standard error. Defaults to "sd"
-#' @param na.rm If \code{FALSE}, the default, removes missing values with a warning. If \code{TRUE} silently removes missing values
-#' @param errorbar_tip_size A numeric value specifying the size of the error bar tips in cm. Defaults to 2
-#' @param lineend Line end style (round, butt, square). Default is "butt"
-#' @param linewidth Width of lines. Default is 0.5
-#' @param show.legend Logical. Should this layer be included in the legends? \code{NA}, the default, includes if any aesthetics are mapped. \code{FALSE} never includes, and \code{TRUE} always includes
-#' @param inherit.aes If \code{FALSE}, overrides the default aesthetics, rather than combining with them. This is most useful for helper functions that define both data and aesthetics and shouldn't inherit behaviour from the default plot specification, e.g., \code{borders()}
-#' @return A ggplot2 layer
+#' @param mapping Set of aesthetic mappings created by [ggplot2::aes()].
+#' @param data The data to be displayed in this layer.
+#' @param stat Statistical transformation. The default, `"errorbarb"`, computes
+#'   group means and uncertainty intervals. Use `"identity"` for precomputed
+#'   endpoints.
+#' @param position Position adjustment.
+#' @param ... Other arguments passed to [ggplot2::layer()].
+#' @param fun.errorbar Error calculation method, either `"sd"` or `"se"`.
+#' @param na.rm If `FALSE`, missing values are removed with a warning. If
+#'   `TRUE`, missing values are silently removed.
+#' @param errorbar_tip_size Error-bar tip width in centimeters. Defaults to
+#'   `0.2`, preserving the historical default appearance of approximately
+#'   2 mm while correcting the documented physical unit.
+#' @param lineend Line-end style: `"round"`, `"butt"`, or `"square"`.
+#' @param linewidth Width of lines.
+#' @param show.legend Logical. Should this layer be included in legends?
+#' @param inherit.aes If `FALSE`, override rather than combine plot aesthetics.
+#'
+#' @return A ggplot2 layer.
 #' @examples
 #' library(ggplot2)
-#' ggplot(mtcars, aes(x = wt, y = mpg)) +
+#' ggplot(mtcars, aes(wt, mpg)) +
+#'   geom_point() +
 #'   geom_errorbarb()
 #' @export
 geom_errorbarb <- function(
   mapping = NULL,
   data = NULL,
-  stat = "identity",
+  stat = "errorbarb",
   position = "identity",
   ...,
   fun.errorbar = "sd",
   na.rm = FALSE,
-  errorbar_tip_size = 2,
+  errorbar_tip_size = 0.2,
   lineend = "butt",
-  linewidth = .5,
+  linewidth = 0.5,
   show.legend = NA,
   inherit.aes = TRUE
 ) {
-  layer(
+  params <- list(
+    na.rm = na.rm,
+    errorbar_tip_size = errorbar_tip_size,
+    lineend = lineend,
+    linewidth = linewidth,
+    ...
+  )
+  if (!identical(stat, "identity") && !inherits(stat, "StatIdentity")) {
+    params$fun.errorbar <- fun.errorbar
+  }
+
+  ggplot2::layer(
     data = data,
     mapping = mapping,
     stat = stat,
@@ -42,77 +62,127 @@ geom_errorbarb <- function(
     position = position,
     show.legend = show.legend,
     inherit.aes = inherit.aes,
-    params = list(
-      fun.errorbar = fun.errorbar,
-      na.rm = na.rm,
-      errorbar_tip_size = errorbar_tip_size,
-      linewidth = linewidth,
-      ...
-    )
+    params = params
   )
+}
+
+draw_errorbarb_row <- function(data, errorbar_tip_size, lineend) {
+  gp <- grid::gpar(
+    col = ggplot2::alpha(data$colour, data$alpha),
+    lwd = data$linewidth * ggplot2::.pt,
+    lty = data$linetype,
+    lineend = lineend
+  )
+  tip <- grid::unit(errorbar_tip_size, "cm")
+  half_tip <- tip / 2
+  children <- list()
+
+  vertical_ok <- all(is.finite(c(data$x, data$ymin, data$ymax))) &&
+    data$ymax > data$ymin
+  if (vertical_ok) {
+    x <- grid::unit(data$x, "native")
+    ymin <- grid::unit(data$ymin, "native")
+    ymax <- grid::unit(data$ymax, "native")
+    children <- c(
+      children,
+      list(
+        grid::segmentsGrob(x, ymin, x, ymax, gp = gp),
+        grid::segmentsGrob(x - half_tip, ymin, x + half_tip, ymin, gp = gp),
+        grid::segmentsGrob(x - half_tip, ymax, x + half_tip, ymax, gp = gp)
+      )
+    )
+  }
+
+  horizontal_ok <- all(is.finite(c(data$y, data$xmin, data$xmax))) &&
+    data$xmax > data$xmin
+  if (horizontal_ok) {
+    y <- grid::unit(data$y, "native")
+    xmin <- grid::unit(data$xmin, "native")
+    xmax <- grid::unit(data$xmax, "native")
+    children <- c(
+      children,
+      list(
+        grid::segmentsGrob(xmin, y, xmax, y, gp = gp),
+        grid::segmentsGrob(xmin, y - half_tip, xmin, y + half_tip, gp = gp),
+        grid::segmentsGrob(xmax, y - half_tip, xmax, y + half_tip, gp = gp)
+      )
+    )
+  }
+
+  if (length(children) == 0L) {
+    return(grid::nullGrob())
+  }
+  do.call(grid::grobTree, children)
 }
 
 #' Geomerrorbarb ggproto object
 #'
-#' Internal ggproto backing `geom_errorbarb()`. Most users should call
-#' `geom_errorbarb()` directly rather than constructing this object manually.
+#' Internal ggproto backing [geom_errorbarb()]. Most users should call
+#' `geom_errorbarb()` directly.
 #'
 #' @format NULL
 #' @usage NULL
 #' @family ggplot2 geoms
-#' @importFrom grid nullGrob unit
 #' @export
-Geomerrorbarb <- ggproto(
+Geomerrorbarb <- ggplot2::ggproto(
   "Geomerrorbarb",
-  Geom,
-
-  # Transform the data inside the draw_panel() method
+  ggplot2::Geom,
+  required_aes = c("x", "y", "xmin", "xmax", "ymin", "ymax"),
   draw_group = function(
     data,
     panel_params,
     coord,
-    fun.errorbar = "sd",
     na.rm = FALSE,
-    errorbar_tip_size = 2,
+    errorbar_tip_size = 0.2,
     lineend = "butt"
   ) {
-    if (is.null(data) || nrow(data) == 0) {
-      return(nullGrob())
+    if (
+      !is.numeric(errorbar_tip_size) ||
+        length(errorbar_tip_size) != 1L ||
+        !is.finite(errorbar_tip_size) ||
+        errorbar_tip_size <= 0
+    ) {
+      rlang::abort(
+        "`errorbar_tip_size` must be one positive finite number in centimeters.",
+        class = "ggbothbar_input_error"
+      )
     }
-    # Supply the coordinate system for the plot
+    if (
+      !is.character(lineend) ||
+        length(lineend) != 1L ||
+        is.na(lineend) ||
+        !lineend %in% c("round", "butt", "square")
+    ) {
+      rlang::abort(
+        "`lineend` must be one of \"round\", \"butt\", or \"square\".",
+        class = "ggbothbar_input_error"
+      )
+    }
     if (!coord$is_linear()) {
       rlang::warn(
-        "spring geom only works correctly on linear coordinate systems"
+        "`geom_errorbarb()` is only guaranteed on linear coordinate systems.",
+        class = "ggbothbar_coordinate_warning"
       )
     }
-    coord <- coord$transform(data, panel_params)
 
-    # Construct the grob
-    errorbarbGrob(
-      coord$x,
-      coord$y,
-      default.units = "native",
-      fun.errorbar = fun.errorbar,
-      na.rm = na.rm,
-      errorbar_tip_size = unit(errorbar_tip_size, "cm"),
-      gp = grid::gpar(
-        col = alpha(coord$colour, coord$alpha),
-        lwd = coord$linewidth * ggplot2::.pt,
-        lty = coord$linetype,
-        lineend = lineend
-      )
+    data <- coord$transform(data, panel_params)
+    grobs <- lapply(
+      seq_len(nrow(data)),
+      function(index) {
+        draw_errorbarb_row(
+          data[index, , drop = FALSE],
+          errorbar_tip_size = errorbar_tip_size,
+          lineend = lineend
+        )
+      }
     )
+    do.call(grid::grobTree, grobs)
   },
-  draw_key = draw_key_path,
-
-  # Specify the default and required aesthetics
-  required_aes = c("x", "y"),
-  default_aes = aes(
+  draw_key = ggplot2::draw_key_path,
+  default_aes = ggplot2::aes(
     colour = "black",
-    linewidth = .5,
+    linewidth = 0.5,
     linetype = 1L,
-    alpha = NA,
-    fun.errorbar = "sd",
-    errorbar_tip_size = 2
+    alpha = NA
   )
 )
