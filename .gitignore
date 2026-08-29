@@ -4,5 +4,9 @@
 .Ruserdata
 .DS_Store
 /.quarto/
-vignettes
+vignettes/*
+!vignettes/ggbothbar-workflow.Rmd
 .collective/
+/tests/testthat/Rplots.pdf
+/doc/
+/Meta/

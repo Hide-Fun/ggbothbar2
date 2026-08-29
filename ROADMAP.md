@@ -39,6 +39,19 @@ Dependency order:
 `documentation and package check` → `1.1.2 candidate` → `structural changes` →
 `1.2.0 candidate`
 
+### Implementation status (2026-08-29)
+
+- The 1.1.2 repair candidate is implemented on `fix/1.1.2`, including the
+  regression suite, CI workflow, metadata, README, and English vignette.
+- A source build and isolated `R CMD check --as-cran --no-manual` pass locally
+  with 0 errors and 0 warnings. The remaining NOTE is the external CRAN policy
+  diagnostic `New submission` because the package is not registered there.
+- The declared GitHub Actions matrix, optional live Google smoke test, issue
+  closure, tag, push, and release publication remain execution-time release
+  steps. They have not been run because external publication was not
+  authorised.
+- Work on 1.2.0 has not started.
+
 ## Milestone 1.1.2 — repair release
 
 ### 1. Establish the safety net — L
