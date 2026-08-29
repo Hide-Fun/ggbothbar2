@@ -10,6 +10,7 @@ assert_parameters(
   name,
   local,
   download,
+  overwrite,
   filter = TRUE,
   freeze_first_row = TRUE,
   auto_width = TRUE
@@ -25,6 +26,8 @@ assert_parameters(
 \item{local}{Local Excel option}
 
 \item{download}{Download option}
+
+\item{overwrite}{Overwrite option; \code{NULL} or a single logical value}
 
 \item{filter}{Filter option}
 

@@ -36,25 +36,73 @@ se <- function(x, na.rm = FALSE) {
 #' calc_error(c(1, 2, 3, 4, 5), fun.errorbar = function(x) max(x) - min(x))
 #' @export
 calc_error <- function(x, fun.errorbar = "sd", na.rm = FALSE) {
+  if (!is.numeric(x)) {
+    rlang::abort("`x` must be numeric.", class = "ggbothbar_input_error")
+  }
+  if (!is.logical(na.rm) || length(na.rm) != 1L || is.na(na.rm)) {
+    rlang::abort(
+      "`na.rm` must be a single non-missing logical value.",
+      class = "ggbothbar_input_error"
+    )
+  }
+
   if (is.character(fun.errorbar)) {
+    if (length(fun.errorbar) != 1L || is.na(fun.errorbar)) {
+      rlang::abort(
+        "`fun.errorbar` must be one of \"sd\", \"se\", or \"ci\".",
+        class = "ggbothbar_input_error"
+      )
+    }
     if (fun.errorbar == "sd") {
-      stats::sd(x, na.rm = na.rm)
+      result <- stats::sd(x, na.rm = na.rm)
     } else if (fun.errorbar == "se") {
-      se(x, na.rm = na.rm)
+      result <- se(x, na.rm = na.rm)
     } else if (fun.errorbar == "ci") {
       n <- if (na.rm) sum(!is.na(x)) else length(x)
       if (n <= 1L) {
-        return(NA_real_)
+        result <- NA_real_
+      } else {
+        result <- se(x, na.rm = na.rm) * stats::qt(0.975, df = n - 1)
       }
-      se(x, na.rm = na.rm) * stats::qt(0.975, df = n - 1)
     } else {
-      stop("Unsupported fun.errorbar: ", fun.errorbar)
+      rlang::abort(
+        paste0("Unsupported `fun.errorbar`: ", fun.errorbar, "."),
+        class = "ggbothbar_input_error"
+      )
     }
   } else if (is.function(fun.errorbar)) {
-    fun.errorbar(x)
+    if (na.rm) {
+      x <- x[!is.na(x)]
+    }
+    result <- fun.errorbar(x)
   } else {
-    stop("fun.errorbar must be a character string or function")
+    rlang::abort(
+      "`fun.errorbar` must be a character string or function.",
+      class = "ggbothbar_input_error"
+    )
   }
+
+  validate_error_result(result)
+}
+
+validate_error_result <- function(result) {
+  valid_na <- is.numeric(result) &&
+    length(result) == 1L &&
+    is.na(result) &&
+    !is.nan(result)
+  valid_finite <- is.numeric(result) &&
+    length(result) == 1L &&
+    is.finite(result)
+  if (!valid_na && !valid_finite) {
+    rlang::abort(
+      paste0(
+        "`fun.errorbar` must return one finite numeric value ",
+        "or `NA_real_`."
+      ),
+      class = "ggbothbar_input_error"
+    )
+  }
+  as.numeric(result)
 }
 
 #' Calculate Isotopic Enrichment
@@ -69,6 +117,8 @@ calc_error <- function(x, fun.errorbar = "sd", na.rm = FALSE) {
 #'   \code{"d"} in each entry of \code{delta} for \code{"e"} when \code{delta} matches the pattern \code{^d\\d+[A-Za-z]+$}
 #' @param reference Character string specifying the reference group value in the 'var' column
 #' @param na.rm Logical; if TRUE, removes NA values when calculating mean reference values
+#' @param overwrite Logical; if `TRUE`, existing columns named by `epsilon` may
+#'   be replaced. Defaults to `FALSE`.
 #'
 #' @return A data frame with additional enrichment columns, one for each element of \code{delta}
 #'
@@ -81,7 +131,7 @@ calc_error <- function(x, fun.errorbar = "sd", na.rm = FALSE) {
 #'   d34S = c(12.0, 11.5, 13.2, 12.4)
 #' )
 #'
-#' # 1) Default: epsilon names are inferred as "e13C" and "e15N" (backword compatibility)
+#' # 1) Default output names are inferred as "e13C" and "e15N"
 #' out1 <- calc_enrichment(df)
 #' head(out1)
 #'
@@ -115,33 +165,81 @@ calc_enrichment <- function(
   delta = c("d13C", "d15N"),
   epsilon = NULL,
   reference = "reference",
-  na.rm = FALSE
+  na.rm = FALSE,
+  overwrite = FALSE
 ) {
   # -- Validation -------------------------------------------------------------
+  if (!is.data.frame(data)) {
+    rlang::abort("`data` must be a data frame.", class = "ggbothbar_input_error")
+  }
+  if (!is.logical(na.rm) || length(na.rm) != 1L || is.na(na.rm)) {
+    rlang::abort(
+      "`na.rm` must be a single non-missing logical value.",
+      class = "ggbothbar_input_error"
+    )
+  }
+  if (!is.logical(overwrite) || length(overwrite) != 1L || is.na(overwrite)) {
+    rlang::abort(
+      "`overwrite` must be a single non-missing logical value.",
+      class = "ggbothbar_input_error"
+    )
+  }
+
   # Check that `var` column exists
   if (!is.character(var) || length(var) != 1L || !(var %in% names(data))) {
-    stop("`var` must be the name of a column in `data`.")
+    rlang::abort(
+      "`var` must be the name of a column in `data`.",
+      class = "ggbothbar_input_error"
+    )
   }
 
   # Check that `reference` level exists
   if (!is.character(reference) || length(reference) != 1L) {
-    stop("`reference` must be a single character value.")
+    rlang::abort(
+      "`reference` must be a single character value.",
+      class = "ggbothbar_input_error"
+    )
   }
-  reference_rows <- data[[var]] == reference
-  if (!any(reference_rows, na.rm = TRUE)) {
-    stop("No rows match `reference` in the `var` column.")
+  reference_rows <- !is.na(data[[var]]) & data[[var]] == reference
+  if (!any(reference_rows)) {
+    rlang::abort(
+      "No rows match `reference` in the `var` column.",
+      class = "ggbothbar_input_error"
+    )
   }
 
   # Check `delta`
   if (!is.character(delta) || length(delta) < 1L) {
-    stop("`delta` must be a character vector of length >= 1.")
+    rlang::abort(
+      "`delta` must be a character vector of length >= 1.",
+      class = "ggbothbar_input_error"
+    )
+  }
+  if (anyNA(delta) || any(!nzchar(delta)) || anyDuplicated(delta)) {
+    rlang::abort(
+      "`delta` must contain unique, non-missing column names.",
+      class = "ggbothbar_input_error"
+    )
   }
   missing_delta <- setdiff(delta, names(data))
   if (length(missing_delta) > 0L) {
-    stop(sprintf(
-      "These `delta` columns are missing in `data`: %s",
-      paste(missing_delta, collapse = ", ")
-    ))
+    rlang::abort(
+      sprintf(
+        "These `delta` columns are missing in `data`: %s",
+        paste(missing_delta, collapse = ", ")
+      ),
+      class = "ggbothbar_input_error"
+    )
+  }
+  non_numeric_delta <- delta[!vapply(data[delta], is.numeric, logical(1))]
+  if (length(non_numeric_delta) > 0L) {
+    rlang::abort(
+      sprintf(
+        "These `delta` columns must be numeric: %s",
+        paste(non_numeric_delta, collapse = ", ")
+      ),
+      class = "ggbothbar_input_error"
+    )
   }
 
   # Derive or validate `epsilon`
@@ -151,16 +249,42 @@ calc_enrichment <- function(
     is_valid <- grepl("^d\\d+[A-Za-z]+$", delta, perl = TRUE)
     if (!all(is_valid)) {
       bad <- delta[!is_valid]
-      stop(sprintf(
-        "When `epsilon` is NULL, each `delta` must match pattern ^d\\d+[A-Za-z]+$. Invalid: %s",
-        paste(bad, collapse = ", ")
-      ))
+      rlang::abort(
+        sprintf(
+          "When `epsilon` is NULL, each `delta` must match pattern ^d\\d+[A-Za-z]+$. Invalid: %s",
+          paste(bad, collapse = ", ")
+        ),
+        class = "ggbothbar_input_error"
+      )
     }
     epsilon <- sub("^d", "e", delta)
   } else {
     if (!is.character(epsilon) || length(epsilon) != length(delta)) {
-      stop("`epsilon` must be a character vector the same length as `delta`.")
+      rlang::abort(
+        "`epsilon` must be a character vector the same length as `delta`.",
+        class = "ggbothbar_input_error"
+      )
     }
+  }
+  if (anyNA(epsilon) || any(!nzchar(epsilon)) || anyDuplicated(epsilon)) {
+    rlang::abort(
+      "`epsilon` must contain unique, non-missing output names.",
+      class = "ggbothbar_input_error"
+    )
+  }
+
+  collisions <- intersect(epsilon, names(data))
+  if (length(collisions) > 0L && !overwrite) {
+    rlang::abort(
+      sprintf(
+        paste0(
+          "These `epsilon` columns already exist: %s. ",
+          "Use `overwrite = TRUE` to replace them."
+        ),
+        paste(collisions, collapse = ", ")
+      ),
+      class = "ggbothbar_name_collision"
+    )
   }
 
   # -- Computation ------------------------------------------------------------
@@ -172,12 +296,34 @@ calc_enrichment <- function(
     function(col) mean(reference_data[[col]], na.rm = na.rm),
     numeric(1)
   )
+  invalid_means <- !is.finite(ref_means)
+  if (any(invalid_means)) {
+    rlang::warn(
+      c(
+        paste0(
+          "Reference means are not finite for: ",
+          paste(delta[invalid_means], collapse = ", "),
+          "."
+        ),
+        i = paste0(
+          "Affected enrichment columns will be filled with `NA`: ",
+          paste(epsilon[invalid_means], collapse = ", "),
+          "."
+        )
+      ),
+      class = "ggbothbar_reference_mean_warning"
+    )
+  }
 
   # Prepare result and append enrichment columns
   result <- data
   for (i in seq_along(delta)) {
     # Enrichment = sample value - reference mean
-    result[[epsilon[i]]] <- data[[delta[i]]] - ref_means[i]
+    result[[epsilon[i]]] <- if (invalid_means[i]) {
+      rep(NA_real_, nrow(data))
+    } else {
+      data[[delta[i]]] - ref_means[i]
+    }
   }
 
   return(result)
@@ -377,6 +523,10 @@ label_isotope <- function(
 #' @param filter Logical. Whether to enable column filters on the header row.
 #' @param freeze_first_row Logical. Whether to freeze the first row.
 #' @param auto_width Logical. Whether to automatically fit column widths.
+#' @param overwrite Logical or `NULL`. Set `FALSE` to protect an existing local
+#'   xlsx file, or `TRUE` to replace it. During the 1.1.2 transition, `NULL`
+#'   preserves the previous overwrite behavior with a warning when a local file
+#'   may be written.
 #'
 #' @return A tibble with:
 #' \itemize{
@@ -445,7 +595,8 @@ write_sheets <- function(
   path = NULL, # File path for local save or download
   filter = TRUE, # Whether to add filters to the header row
   freeze_first_row = TRUE, # Whether to freeze the first row
-  auto_width = TRUE # Whether to auto-fit column widths
+  auto_width = TRUE, # Whether to auto-fit column widths
+  overwrite = NULL # Whether an existing local file may be replaced
 ) {
   # Validate parameters
   assert_parameters(
@@ -454,17 +605,34 @@ write_sheets <- function(
     name,
     local,
     download,
-    filter,
-    freeze_first_row,
-    auto_width
+    overwrite = overwrite,
+    filter = filter,
+    freeze_first_row = freeze_first_row,
+    auto_width = auto_width
   )
 
   # Validate dependencies
   assert_dependencies(local, download)
 
+  if (is.null(overwrite)) {
+    if (local || download) {
+      rlang::warn(
+        c(
+          "`overwrite` was not specified; existing files will still be replaced in ggbothbar 1.1.2.",
+          i = "Set `overwrite = TRUE` or `overwrite = FALSE` explicitly."
+        ),
+        class = "ggbothbar_overwrite_warning"
+      )
+    }
+    overwrite <- TRUE
+  }
+
   # Set file path if not provided
   if (is.null(path)) {
     path <- file.path(getwd(), paste0(name, ".xlsx"))
+  }
+  if ((local || download) && file.exists(path) && !overwrite) {
+    abort_existing_file(path)
   }
 
   # Choose the appropriate method based on parameters
@@ -473,6 +641,7 @@ write_sheets <- function(
       .data,
       sheet_names,
       path,
+      overwrite = overwrite,
       filter = filter,
       freeze_first_row = freeze_first_row,
       auto_width = auto_width
@@ -489,7 +658,11 @@ write_sheets <- function(
 
     # Download if requested
     if (download) {
-      file_path <- download_google_sheet(result$spreadsheet_id[[1]], path)
+      file_path <- download_google_sheet(
+        result$spreadsheet_id[[1]],
+        path,
+        overwrite = overwrite
+      )
       if (!is.null(file_path)) {
         result$file_path <- file_path
       }
@@ -544,6 +717,7 @@ assert_dependencies <- function(local, download) {
 #' @param name Spreadsheet/file name
 #' @param local Local Excel option
 #' @param download Download option
+#' @param overwrite Overwrite option; `NULL` or a single logical value
 #' @param filter Filter option
 #' @param freeze_first_row Freeze first row option
 #' @param auto_width Auto-width option
@@ -554,6 +728,7 @@ assert_parameters <- function(
   name,
   local,
   download,
+  overwrite,
   filter = TRUE,
   freeze_first_row = TRUE,
   auto_width = TRUE
@@ -638,6 +813,16 @@ assert_parameters <- function(
     stop("'download' must be a logical value (TRUE or FALSE)", call. = FALSE)
   }
 
+  if (
+    !is.null(overwrite) &&
+      (!is.logical(overwrite) || length(overwrite) != 1L || is.na(overwrite))
+  ) {
+    rlang::abort(
+      "'overwrite' must be NULL or a single logical value (TRUE or FALSE)",
+      class = "ggbothbar_input_error"
+    )
+  }
+
   if (!is.logical(filter) || length(filter) != 1 || is.na(filter)) {
     stop("'filter' must be a logical value (TRUE or FALSE)", call. = FALSE)
   }
@@ -672,6 +857,7 @@ assert_parameters <- function(
 #' @param data_list List of dataframes
 #' @param sheet_names Vector of sheet names
 #' @param file_path Path to save the Excel file
+#' @param overwrite Whether an existing file may be replaced
 #' @param filter Logical. Whether to enable column filters on the header row
 #' @param freeze_first_row Logical. Whether to freeze the first row
 #' @param auto_width Logical. Whether to automatically fit column widths
@@ -681,11 +867,16 @@ write_local_excel <- function(
   data_list,
   sheet_names,
   file_path,
+  overwrite = TRUE,
   filter = TRUE,
   freeze_first_row = TRUE,
   auto_width = TRUE
 ) {
   message("Saving directly to local Excel file: ", file_path)
+
+  if (file.exists(file_path) && !overwrite) {
+    abort_existing_file(file_path)
+  }
 
   # Create a new workbook
   wb <- openxlsx::createWorkbook()
@@ -724,8 +915,26 @@ write_local_excel <- function(
     dir.create(dir_path, recursive = TRUE)
   }
 
-  # Save the workbook
-  openxlsx::saveWorkbook(wb, file_path, overwrite = TRUE)
+  # Save in the destination directory, then prefer an atomic rename.
+  temporary_path <- tempfile(
+    pattern = ".ggbothbar-",
+    tmpdir = dir_path,
+    fileext = ".xlsx"
+  )
+  on.exit(unlink(temporary_path), add = TRUE)
+  openxlsx::saveWorkbook(wb, temporary_path, overwrite = TRUE)
+
+  moved <- file.rename(temporary_path, file_path)
+  if (!moved) {
+    copied <- file.copy(temporary_path, file_path, overwrite = overwrite)
+    if (!copied) {
+      rlang::abort(
+        paste0("Could not write the workbook to: ", file_path),
+        class = "ggbothbar_file_write_error"
+      )
+    }
+    unlink(temporary_path)
+  }
 
   message("Local Excel file saved successfully")
   return(dplyr::tibble(file_path = file_path))
@@ -894,12 +1103,12 @@ apply_google_sheet_format <- function(
 #'
 #' @param spreadsheet_id ID of the spreadsheet to download
 #' @param file_path Path to save the Excel file
+#' @param overwrite Whether an existing file may be replaced
 #' @return The file path if successful, NULL otherwise
 #' @keywords internal
-download_google_sheet <- function(spreadsheet_id, file_path) {
-  if (!googledrive::drive_has_token()) {
-    message("Authenticating with Google Drive...")
-    googledrive::drive_auth()
+download_google_sheet <- function(spreadsheet_id, file_path, overwrite = TRUE) {
+  if (file.exists(file_path) && !overwrite) {
+    abort_existing_file(file_path)
   }
 
   # Create directory if it doesn't exist
@@ -908,15 +1117,31 @@ download_google_sheet <- function(spreadsheet_id, file_path) {
     dir.create(dir_path, recursive = TRUE)
   }
 
+  if (!googledrive::drive_has_token()) {
+    message("Authenticating with Google Drive...")
+    googledrive::drive_auth()
+  }
+
   # Download the file
   message("Downloading spreadsheet to: ", file_path)
   googledrive::drive_download(
     file = googledrive::as_id(spreadsheet_id),
     path = file_path,
     type = "xlsx",
-    overwrite = TRUE
+    overwrite = overwrite
   )
 
   message("Download completed successfully")
   return(file_path)
+}
+
+abort_existing_file <- function(file_path) {
+  rlang::abort(
+    paste0(
+      "The destination already exists: ",
+      file_path,
+      ". Set `overwrite = TRUE` to replace it."
+    ),
+    class = "ggbothbar_file_exists"
+  )
 }

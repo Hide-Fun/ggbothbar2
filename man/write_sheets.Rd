@@ -13,7 +13,8 @@ write_sheets(
   path = NULL,
   filter = TRUE,
   freeze_first_row = TRUE,
-  auto_width = TRUE
+  auto_width = TRUE,
+  overwrite = NULL
 )
 }
 \arguments{
@@ -35,6 +36,11 @@ If NULL (default), saves to working directory with \code{name}.}
 \item{freeze_first_row}{Logical. Whether to freeze the first row.}
 
 \item{auto_width}{Logical. Whether to automatically fit column widths.}
+
+\item{overwrite}{Logical or \code{NULL}. Set \code{FALSE} to protect an existing local
+xlsx file, or \code{TRUE} to replace it. During the 1.1.2 transition, \code{NULL}
+preserves the previous overwrite behavior with a warning when a local file
+may be written.}
 }
 \value{
 A tibble with:

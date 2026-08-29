@@ -8,6 +8,7 @@ write_local_excel(
   data_list,
   sheet_names,
   file_path,
+  overwrite = TRUE,
   filter = TRUE,
   freeze_first_row = TRUE,
   auto_width = TRUE
@@ -19,6 +20,8 @@ write_local_excel(
 \item{sheet_names}{Vector of sheet names}
 
 \item{file_path}{Path to save the Excel file}
+
+\item{overwrite}{Whether an existing file may be replaced}
 
 \item{filter}{Logical. Whether to enable column filters on the header row}
 

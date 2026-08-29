@@ -10,7 +10,8 @@ calc_enrichment(
   delta = c("d13C", "d15N"),
   epsilon = NULL,
   reference = "reference",
-  na.rm = FALSE
+  na.rm = FALSE,
+  overwrite = FALSE
 )
 }
 \arguments{
@@ -26,6 +27,9 @@ calc_enrichment(
 \item{reference}{Character string specifying the reference group value in the 'var' column}
 
 \item{na.rm}{Logical; if TRUE, removes NA values when calculating mean reference values}
+
+\item{overwrite}{Logical; if \code{TRUE}, existing columns named by \code{epsilon} may
+be replaced. Defaults to \code{FALSE}.}
 }
 \value{
 A data frame with additional enrichment columns, one for each element of \code{delta}
@@ -43,7 +47,7 @@ df <- data.frame(
   d34S = c(12.0, 11.5, 13.2, 12.4)
 )
 
-# 1) Default: epsilon names are inferred as "e13C" and "e15N" (backword compatibility)
+# 1) Default output names are inferred as "e13C" and "e15N"
 out1 <- calc_enrichment(df)
 head(out1)
 

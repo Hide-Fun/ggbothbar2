@@ -4,12 +4,14 @@
 \alias{download_google_sheet}
 \title{Download a Google Spreadsheet as Excel}
 \usage{
-download_google_sheet(spreadsheet_id, file_path)
+download_google_sheet(spreadsheet_id, file_path, overwrite = TRUE)
 }
 \arguments{
 \item{spreadsheet_id}{ID of the spreadsheet to download}
 
 \item{file_path}{Path to save the Excel file}
+
+\item{overwrite}{Whether an existing file may be replaced}
 }
 \value{
 The file path if successful, NULL otherwise
