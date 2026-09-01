@@ -9,7 +9,9 @@ inverse_scale_position <- function(values, scale) {
 }
 
 transform_scale_position <- function(values, scale) {
-  if (is.null(scale) || is.null(scale$trans) || is.null(scale$trans$transform)) {
+  if (
+    is.null(scale) || is.null(scale$trans) || is.null(scale$trans$transform)
+  ) {
     return(values)
   }
   scale$trans$transform(values)

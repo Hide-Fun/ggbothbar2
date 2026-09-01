@@ -210,7 +210,12 @@ create_errorbarb <- function(x, y, height, width, errorbar_tip_size) {
   }
 
   if (length(segments) == 0L) {
-    return(data.frame(x = numeric(), xend = numeric(), y = numeric(), yend = numeric()))
+    return(data.frame(
+      x = numeric(),
+      xend = numeric(),
+      y = numeric(),
+      yend = numeric()
+    ))
   }
   do.call(rbind, segments)
 }

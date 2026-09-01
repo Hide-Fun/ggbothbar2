@@ -194,7 +194,10 @@ adjust_axis_scales <- function(
   expand = ggplot2::waiver()
 ) {
   if (!inherits(plot, "gg")) {
-    rlang::abort("`plot` must be a ggplot object.", class = "ggbothbar_input_error")
+    rlang::abort(
+      "`plot` must be a ggplot object.",
+      class = "ggbothbar_input_error"
+    )
   }
   validate_axis_options(
     x_break_step = x_break_step,

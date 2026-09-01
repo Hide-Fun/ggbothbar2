@@ -1,5 +1,6 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
+^air\.toml$
 ^LICENSE\.md$
 ^README\.qmd$
 ^README_files$

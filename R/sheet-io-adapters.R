@@ -193,41 +193,55 @@ apply_google_sheet_format <- function(
 
   ss_id <- googlesheets4::as_sheets_id(ss)
   ss_meta <- googlesheets4::gs4_get(ss_id)
-  sheet_info <- ss_meta$sheets[ss_meta$sheets$name == sheet_name, , drop = FALSE]
+  sheet_info <- ss_meta$sheets[
+    ss_meta$sheets$name == sheet_name,
+    ,
+    drop = FALSE
+  ]
 
   if (nrow(sheet_info) != 1) {
-    stop("Could not identify Google Sheet worksheet: ", sheet_name, call. = FALSE)
+    stop(
+      "Could not identify Google Sheet worksheet: ",
+      sheet_name,
+      call. = FALSE
+    )
   }
 
   sheet_id <- sheet_info$id[[1]]
   requests <- list()
 
   if (filter) {
-    requests <- append(requests, list(list(
-      setBasicFilter = list(
-        filter = list(
-          range = list(
-            sheetId = sheet_id,
-            startRowIndex = 0,
-            endRowIndex = nrow(data) + 1,
-            startColumnIndex = 0,
-            endColumnIndex = ncol(data)
+    requests <- append(
+      requests,
+      list(list(
+        setBasicFilter = list(
+          filter = list(
+            range = list(
+              sheetId = sheet_id,
+              startRowIndex = 0,
+              endRowIndex = nrow(data) + 1,
+              startColumnIndex = 0,
+              endColumnIndex = ncol(data)
+            )
           )
         )
-      )
-    )))
+      ))
+    )
   }
 
   if (freeze_first_row) {
-    requests <- append(requests, list(list(
-      updateSheetProperties = list(
-        properties = list(
-          sheetId = sheet_id,
-          gridProperties = list(frozenRowCount = 1)
-        ),
-        fields = "gridProperties.frozenRowCount"
-      )
-    )))
+    requests <- append(
+      requests,
+      list(list(
+        updateSheetProperties = list(
+          properties = list(
+            sheetId = sheet_id,
+            gridProperties = list(frozenRowCount = 1)
+          ),
+          fields = "gridProperties.frozenRowCount"
+        )
+      ))
+    )
   }
 
   if (length(requests) > 0) {
@@ -239,7 +253,11 @@ apply_google_sheet_format <- function(
   }
 
   if (auto_width) {
-    googlesheets4::range_autofit(ss_id, sheet = sheet_name, dimension = "columns")
+    googlesheets4::range_autofit(
+      ss_id,
+      sheet = sheet_name,
+      dimension = "columns"
+    )
   }
 
   invisible(ss_id)
@@ -252,7 +270,11 @@ apply_google_sheet_format <- function(
 #' @param overwrite Whether an existing file may be replaced
 #' @return The file path if successful, NULL otherwise
 #' @keywords internal
-download_google_sheet <- function(spreadsheet_id, file_path, overwrite = FALSE) {
+download_google_sheet <- function(
+  spreadsheet_id,
+  file_path,
+  overwrite = FALSE
+) {
   if (file.exists(file_path) && !overwrite) {
     abort_existing_file(file_path)
   }

@@ -170,7 +170,10 @@ calc_enrichment <- function(
 ) {
   # -- Validation -------------------------------------------------------------
   if (!is.data.frame(data)) {
-    rlang::abort("`data` must be a data frame.", class = "ggbothbar_input_error")
+    rlang::abort(
+      "`data` must be a data frame.",
+      class = "ggbothbar_input_error"
+    )
   }
   if (!is.logical(na.rm) || length(na.rm) != 1L || is.na(na.rm)) {
     rlang::abort(

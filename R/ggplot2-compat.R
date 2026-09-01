@@ -56,18 +56,20 @@ apply_axis_adjustment <- function(
 ) {
   adjusted <- plot
   if (!is.null(x_range)) {
-    adjusted <- adjusted + clone_axis_scale(
-      x_info,
-      breaks = x_range$breaks,
-      expand = expand
-    )
+    adjusted <- adjusted +
+      clone_axis_scale(
+        x_info,
+        breaks = x_range$breaks,
+        expand = expand
+      )
   }
   if (!is.null(y_range)) {
-    adjusted <- adjusted + clone_axis_scale(
-      y_info,
-      breaks = y_range$breaks,
-      expand = expand
-    )
+    adjusted <- adjusted +
+      clone_axis_scale(
+        y_info,
+        breaks = y_range$breaks,
+        expand = expand
+      )
   }
 
   adjusted$coordinates <- adjusted_coordinate(
