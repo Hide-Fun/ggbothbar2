@@ -22,8 +22,16 @@
 #' @importFrom ggplot2 coord_fixed
 #' @export
 fix_aspect_ratio <- function(.plot, .ratio, .clip = "off") {
-  if (!is.numeric(.ratio) || length(.ratio) != 1L || !is.finite(.ratio) || .ratio <= 0) {
-    stop("'.ratio' must be a single positive finite numeric value", call. = FALSE)
+  if (
+    !is.numeric(.ratio) ||
+      length(.ratio) != 1L ||
+      !is.finite(.ratio) ||
+      .ratio <= 0
+  ) {
+    stop(
+      "'.ratio' must be a single positive finite numeric value",
+      call. = FALSE
+    )
   }
 
   panel_ranges <- plot_panel_ranges(.plot)

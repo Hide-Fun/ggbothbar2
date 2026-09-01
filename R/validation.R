@@ -96,7 +96,10 @@ assert_parameters <- function(
   }
 
   if (anyNA(sheet_names) || any(!nzchar(sheet_names))) {
-    stop("'sheet_names' must not contain missing or empty values", call. = FALSE)
+    stop(
+      "'sheet_names' must not contain missing or empty values",
+      call. = FALSE
+    )
   }
 
   if (length(sheet_names) != length(.data)) {

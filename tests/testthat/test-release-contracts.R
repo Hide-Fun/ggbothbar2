@@ -22,12 +22,15 @@ test_that("rendering backends are internal while public aliases remain", {
   )
 
   expect_false(any(removed_backends %in% exports))
-  expect_true(all(c(
-    "fix_limit",
-    "fix_aspect_ratio",
-    "theme_aca",
-    "theme_isotope"
-  ) %in% exports))
+  expect_true(all(
+    c(
+      "fix_limit",
+      "fix_aspect_ratio",
+      "theme_aca",
+      "theme_isotope"
+    ) %in%
+      exports
+  ))
 
   namespace <- asNamespace("ggbothbar")
   expect_true(exists(
