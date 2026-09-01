@@ -1,33 +1,35 @@
 Package: ggbothbar
 Type: Package
-Title: Visualise isotopic abundance data
-Version: 1.1.1
+Title: Visualise Isotopic Abundance Data
+Version: 1.2.0
 Authors@R: c(
-    person("Hiedehito", "Okada", , "hidefungi@gmail.com", role = c("aut", "cre"),
+    person("Hidehito", "Okada", , "hidefungi@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-3210-2736"))
   )
-Description: This package provides functions to visualize isotopic abundance data,
-    particularly for mycoheterotrophic plants. It includes functions to calculate
-    and plot standard errors and enrichment factors, and custom ggplot2 geoms for 
-    error bars with various error calculation methods.
+Description: Calculates and visualises isotopic enrichment and grouped
+    uncertainty, particularly for mycoheterotrophic plant studies. Provides
+    'ggplot2' geoms for two-axis error bars and error boxes, isotope-aware
+    labels, plotting themes, and helpers for exporting tabular results.
+URL: https://github.com/Hide-Fun/ggbothbar
+BugReports: https://github.com/Hide-Fun/ggbothbar/issues
 License: MIT + file LICENSE
 Encoding: UTF-8
-LazyData: true
 Roxygen: list(markdown = TRUE)
 VignetteBuilder: knitr
 Depends:
     ggplot2 (>= 3.5.0),
-    R (>= 3.3.0)
+    R (>= 4.1.0)
 Imports: 
     dplyr (>= 1.0.0),
-    googlesheets4 (>= 1.0.0),
-    googledrive (>= 2.0.0),
     purrr (>= 0.3.4),
     rlang (>= 0.4.11)
 Suggests:
-    openxlsx (>= 4.2.5),
-    testthat (>= 3.0.0),
+    googledrive (>= 2.0.0),
+    googlesheets4 (>= 1.0.0),
     knitr (>= 1.30),
+    openxlsx (>= 4.2.5),
     rmarkdown (>= 2.5),
-    patchwork
+    testthat (>= 3.1.7),
+    vdiffr (>= 1.0.0)
 Config/roxygen2/version: 8.0.0
+Config/testthat/edition: 3

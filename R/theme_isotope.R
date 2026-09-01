@@ -33,9 +33,6 @@ theme_aca <- function(
 
     # Customize theme elements
     theme(
-      # Remove legend
-      legend.position = "none",
-
       # Format axis titles
       axis.title.x = element_text(
         size = base_size,

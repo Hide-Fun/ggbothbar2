@@ -2,17 +2,17 @@
 % Please edit documentation in R/geom_errorbarb.R
 \name{geom_errorbarb}
 \alias{geom_errorbarb}
-\title{Geom for Error Bars (Both x & y axis) with Custom Tips}
+\title{Geom for two-axis error bars with fixed physical tips}
 \usage{
 geom_errorbarb(
   mapping = NULL,
   data = NULL,
-  stat = "identity",
+  stat = "errorbarb",
   position = "identity",
   ...,
   fun.errorbar = "sd",
   na.rm = FALSE,
-  errorbar_tip_size = 2,
+  errorbar_tip_size = 0.2,
   lineend = "butt",
   linewidth = 0.5,
   show.legend = NA,
@@ -20,38 +20,46 @@ geom_errorbarb(
 )
 }
 \arguments{
-\item{mapping}{Set of aesthetic mappings created by \code{aes()} or \code{aes_()}. If specified and \code{inherit.aes = TRUE} (the default), it is combined with the default mapping at the top level of the plot. You must supply \code{mapping} if there is no plot mapping}
+\item{mapping}{Set of aesthetic mappings created by \code{\link[ggplot2:aes]{ggplot2::aes()}}.}
 
-\item{data}{The data to be displayed in this layer. There are three options: If \code{NULL}, the default, the data is inherited from the plot data as specified in the call to \code{ggplot()}. A \code{data.frame}, or other object, will override the plot data. All objects will be fortified to produce a data frame. See \code{fortify()} for which variables will be created. A \code{function} will be called with a single argument, the plot data. The return value must be a \code{data.frame}, and will be used as the layer data}
+\item{data}{The data to be displayed in this layer.}
 
-\item{stat}{The statistical transformation to use on the data for this layer, as a string}
+\item{stat}{Statistical transformation. The default, \code{"errorbarb"}, computes
+group means and uncertainty intervals. Use \code{"identity"} for precomputed
+endpoints.}
 
-\item{position}{Position adjustment, either as a string, or the result of a call to a position adjustment function}
+\item{position}{Position adjustment.}
 
-\item{...}{Other arguments passed on to \code{layer()}. These are often aesthetics, used to set an aesthetic to a fixed value, like \code{colour = "red"} or \code{size = 3}. They may also be parameters to the paired geom/stat}
+\item{...}{Other arguments passed to \code{\link[ggplot2:layer]{ggplot2::layer()}}.}
 
-\item{fun.errorbar}{A character string indicating the method to calculate the error bar. It can be either "sd" for standard deviation or "se" for standard error. Defaults to "sd"}
+\item{fun.errorbar}{Error calculation method, either \code{"sd"} or \code{"se"}.}
 
-\item{na.rm}{If \code{FALSE}, the default, removes missing values with a warning. If \code{TRUE} silently removes missing values}
+\item{na.rm}{If \code{FALSE}, missing values are removed with a warning. If
+\code{TRUE}, missing values are silently removed.}
 
-\item{errorbar_tip_size}{A numeric value specifying the size of the error bar tips in cm. Defaults to 2}
+\item{errorbar_tip_size}{Error-bar tip width in centimeters. Defaults to
+\code{0.2}, preserving the historical default appearance of approximately
+2 mm while correcting the documented physical unit.}
 
-\item{lineend}{Line end style (round, butt, square). Default is "butt"}
+\item{lineend}{Line-end style: \code{"round"}, \code{"butt"}, or \code{"square"}.}
 
-\item{linewidth}{Width of lines. Default is 0.5}
+\item{linewidth}{Width of lines.}
 
-\item{show.legend}{Logical. Should this layer be included in the legends? \code{NA}, the default, includes if any aesthetics are mapped. \code{FALSE} never includes, and \code{TRUE} always includes}
+\item{show.legend}{Logical. Should this layer be included in legends?}
 
-\item{inherit.aes}{If \code{FALSE}, overrides the default aesthetics, rather than combining with them. This is most useful for helper functions that define both data and aesthetics and shouldn't inherit behaviour from the default plot specification, e.g., \code{borders()}}
+\item{inherit.aes}{If \code{FALSE}, override rather than combine plot aesthetics.}
 }
 \value{
-A ggplot2 layer
+A ggplot2 layer.
 }
 \description{
-This function creates a custom ggplot2 geom for drawing error bars with specified error calculation methods and tip sizes.
+\code{geom_errorbarb()} summarizes each group in the original data space and
+draws uncertainty intervals along both x and y. Use \code{stat = "identity"}
+with precomputed \code{xmin}, \code{xmax}, \code{ymin}, and \code{ymax} aesthetics.
 }
 \examples{
 library(ggplot2)
-ggplot(mtcars, aes(x = wt, y = mpg)) +
+ggplot(mtcars, aes(wt, mpg)) +
+  geom_point() +
   geom_errorbarb()
 }

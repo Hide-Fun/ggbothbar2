@@ -1,0 +1,79 @@
+---
+title: "A Core Isotope Workflow with ggbothbar"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{A Core Isotope Workflow with ggbothbar}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5
+)
+```
+
+`ggbothbar` supports a compact workflow for replicate isotope measurements:
+calculate enrichment relative to a reference group, summarise uncertainty in
+both dimensions, and label group means.
+
+## Prepare replicate measurements
+
+```{r data}
+library(ggbothbar)
+
+isotopes <- data.frame(
+  type = rep(c("reference", "orchid A", "orchid B"), each = 3),
+  d13C = c(-27.1, -26.8, -27.0, -23.5, -23.1, -23.3, -20.9, -21.2, -21.0),
+  d15N = c(2.0, 2.3, 2.1, 5.8, 6.1, 5.9, 8.2, 7.9, 8.1)
+)
+```
+
+`calc_enrichment()` subtracts each reference mean from every observation. The
+default output names replace the leading `d` with `e`.
+
+```{r enrichment}
+enriched <- calc_enrichment(
+  isotopes,
+  delta = c("d13C", "d15N"),
+  reference = "reference"
+)
+
+enriched
+```
+
+Existing output columns are protected by default. Use `overwrite = TRUE` only
+when replacing them is intentional.
+
+## Plot grouped uncertainty
+
+Map `group` explicitly so each biological group is summarised separately.
+`geom_errorbarb()` calculates the group mean and either standard deviation or
+standard error along both axes. Its cap width is a physical size in centimetres,
+so it remains visually stable when the plotting viewport changes.
+
+```{r plot, fig.alt="Carbon and nitrogen enrichment means with two-axis standard errors"}
+ggplot(
+  enriched,
+  aes(e13C, e15N, colour = type, group = type, label = type)
+) +
+  geom_point(alpha = 0.55) +
+  geom_errorbarb(fun.errorbar = "se", errorbar_tip_size = 0.2) +
+  stat_mean_point(size = 2.5) +
+  stat_mean_label(
+    geom = "text",
+    position = position_nudge(x = 0.25, y = 0.2),
+    show.legend = FALSE
+  ) +
+  labs(
+    x = label_isotope(13, "C", notation = "epsilon"),
+    y = label_isotope(15, "N", notation = "epsilon")
+  ) +
+  theme_aca(base_size = 13, base_family = "sans")
+```
+
+For already summarised data, use `geom_errorbarb(stat = "identity")` and map
+`xmin`, `xmax`, `ymin`, and `ymax` explicitly.

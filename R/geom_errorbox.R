@@ -1,31 +1,3 @@
-#' ggproto object for error box statistics
-#'
-#' @format ggproto class
-#' @importFrom ggplot2 ggproto
-#' @keywords internal
-StatErrorbox <- ggplot2::ggproto(
-  "StatErrorbox",
-  ggplot2::Stat,
-  required_aes = c("x", "y"),
-  compute_group = function(data, scales, fun.errorbar = "sd", na.rm = FALSE) {
-    x <- data$x
-    y <- data$y
-
-    data.frame(
-      x = mean(x, na.rm = na.rm),
-      y = mean(y, na.rm = na.rm),
-      xmin = mean(x, na.rm = na.rm) -
-        calc_error(x, fun.errorbar = fun.errorbar, na.rm = na.rm),
-      xmax = mean(x, na.rm = na.rm) +
-        calc_error(x, fun.errorbar = fun.errorbar, na.rm = na.rm),
-      ymin = mean(y, na.rm = na.rm) -
-        calc_error(y, fun.errorbar = fun.errorbar, na.rm = na.rm),
-      ymax = mean(y, na.rm = na.rm) +
-        calc_error(y, fun.errorbar = fun.errorbar, na.rm = na.rm)
-    )
-  }
-)
-
 #' Add error boxes to a plot
 #'
 #' This function draws a rectangular error box centered at the mean of x and y coordinates,
@@ -34,7 +6,9 @@ StatErrorbox <- ggplot2::ggproto(
 #'
 #' @param mapping Set of aesthetic mappings, usually created with `aes()`
 #' @param data The data to be displayed. If NULL, the default, the data is inherited from the plot data
-#' @param stat The statistical transformation to use on the data
+#' @param stat The statistical transformation to use on the data. The default,
+#'   `"errorbox"`, computes group summaries. Use `"identity"` with precomputed
+#'   `xmin`, `xmax`, `ymin`, and `ymax` aesthetics.
 #' @param position Position adjustment
 #' @param ... Other arguments passed to `GeomRect`
 #' @param fun.errorbar Error calculation method ("sd", "se", "ci" or a custom function)
@@ -43,9 +17,11 @@ StatErrorbox <- ggplot2::ggproto(
 #' @param inherit.aes If FALSE, overrides the default aesthetics
 #'
 #' @details
-#' The error box is drawn as a rectangle spanning from xmin to xmax and ymin to ymax,
-#' where these boundaries are calculated based on the specified error method.
-#' The box is centered at the mean values of x and y coordinates.
+#' The error box is drawn as a rectangle spanning from xmin to xmax and ymin to
+#' ymax, where these boundaries are calculated based on the specified error
+#' method. The box is centered at the mean values of x and y coordinates.
+#' Summaries are calculated in the original data space before any continuous
+#' scale transformation is applied.
 #'
 #' Error calculation methods:
 #' \itemize{
@@ -95,18 +71,19 @@ geom_errorbox <- function(
   show.legend = NA,
   inherit.aes = TRUE
 ) {
+  params <- list(na.rm = na.rm, ...)
+  if (!identical(stat, "identity") && !inherits(stat, "StatIdentity")) {
+    params$fun.errorbar <- fun.errorbar
+  }
+
   ggplot2::layer(
     data = data,
     mapping = mapping,
-    stat = StatErrorbox,
+    stat = stat,
     geom = ggplot2::GeomRect,
     position = position,
     show.legend = show.legend,
     inherit.aes = inherit.aes,
-    params = list(
-      fun.errorbar = fun.errorbar,
-      na.rm = na.rm,
-      ...
-    )
+    params = params
   )
 }
