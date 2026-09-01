@@ -21,7 +21,9 @@ geom_errorbox(
 
 \item{data}{The data to be displayed. If NULL, the default, the data is inherited from the plot data}
 
-\item{stat}{The statistical transformation to use on the data}
+\item{stat}{The statistical transformation to use on the data. The default,
+\code{"errorbox"}, computes group summaries. Use \code{"identity"} with precomputed
+\code{xmin}, \code{xmax}, \code{ymin}, and \code{ymax} aesthetics.}
 
 \item{position}{Position adjustment}
 
@@ -44,9 +46,11 @@ with dimensions determined by a specified error calculation method (standard dev
 standard error, 95\% confidence interval, etc.).
 }
 \details{
-The error box is drawn as a rectangle spanning from xmin to xmax and ymin to ymax,
-where these boundaries are calculated based on the specified error method.
-The box is centered at the mean values of x and y coordinates.
+The error box is drawn as a rectangle spanning from xmin to xmax and ymin to
+ymax, where these boundaries are calculated based on the specified error
+method. The box is centered at the mean values of x and y coordinates.
+Summaries are calculated in the original data space before any continuous
+scale transformation is applied.
 
 Error calculation methods:
 \itemize{

@@ -25,7 +25,7 @@
 #'   errorbar_tip_size = unit(5, "cm")
 #' )
 #' grid.draw(errorbar_grob)
-#' @export
+#' @noRd
 errorbarbGrob <- function(
   x = grid::unit(0, "npc"),
   y = grid::unit(0, "npc"),
@@ -69,15 +69,15 @@ errorbarbGrob <- function(
 #' @param x An object of class "errorbarb"
 #' @return A gTree object with the children set to the calculated error bars
 #' @importFrom grid makeContent
-#' @export makeContent.errorbarb
-#' @export
+#' @exportS3Method grid::makeContent
+#' @noRd
 makeContent.errorbarb <- function(x) {
-  # Convert position and diameter values absolute units
+  # Convert positions and physical tip sizes to one common absolute unit.
   coords_x <- grid::convertX(x$x, "mm", valueOnly = TRUE)
   coords_y <- grid::convertY(x$y, "mm", valueOnly = TRUE)
   errorbar_tip_size <- grid::convertUnit(
     x$errorbar_tip_size,
-    "cm",
+    "mm",
     valueOnly = TRUE
   )
 
@@ -103,9 +103,9 @@ makeContent.errorbarb <- function(x) {
     rlang::abort("`fun.errorbar` must be either 'sd' or 'se'.")
   }
 
-  # If height or width cannot be computed (NA or non-positive),
-  # do not draw anything for this panel
-  if (!is.finite(height) || !is.finite(width) || height <= 0 || width <= 0) {
+  valid_height <- is.finite(height) && height > 0
+  valid_width <- is.finite(width) && width > 0
+  if (!valid_height && !valid_width) {
     grid::setChildren(x, grid::gList())
     return(x)
   }
@@ -114,8 +114,8 @@ makeContent.errorbarb <- function(x) {
   errorbarb <- create_errorbarb(
     x = mean(coords_x, na.rm = na.rm),
     y = mean(coords_y, na.rm = na.rm),
-    height = height,
-    width = width,
+    height = if (valid_height) height else 0,
+    width = if (valid_width) width else 0,
     errorbar_tip_size = errorbar_tip_size
   )
 
@@ -145,59 +145,77 @@ makeContent.errorbarb <- function(x) {
 #' @examples
 #' errorbar_coords <- create_errorbarb(0.5, 0.5, 0.1, 0.05, 0.02)
 #' print(errorbar_coords)
-#' @export
+#' @noRd
 create_errorbarb <- function(x, y, height, width, errorbar_tip_size) {
-  # validate the input arguments
-  if (height <= 0) {
-    rlang::abort("`height` must be larger than zero.")
+  values <- c(x, y, height, width, errorbar_tip_size)
+  if (!is.numeric(values) || any(!is.finite(values))) {
+    rlang::abort(
+      "Error-bar coordinates and sizes must be finite numeric values.",
+      class = "ggbothbar_input_error"
+    )
   }
-  if (width <= 0) {
-    rlang::abort("`width` must be larger than zero.")
+  if (height < 0 || width < 0) {
+    rlang::abort(
+      "`height` and `width` must be non-negative.",
+      class = "ggbothbar_input_error"
+    )
   }
   if (errorbar_tip_size <= 0) {
-    rlang::abort("`errorbar_tip_size` must be strictly positive.")
-  }
-  # calculate coordination of errorbarb
-  data.frame(
-    x = c(
-      x - errorbar_tip_size / 2,
-      x - errorbar_tip_size / 2,
-      x - width,
-      x,
-      x - width,
-      x + width,
-      x,
-      x
-    ),
-    xend = c(
-      x + errorbar_tip_size / 2,
-      x + errorbar_tip_size / 2,
-      x,
-      x + width,
-      x - width,
-      x + width,
-      x,
-      x
-    ),
-    y = c(
-      y + height,
-      y - height,
-      y,
-      y,
-      y - errorbar_tip_size / 2,
-      y - errorbar_tip_size / 2,
-      y,
-      y
-    ),
-    yend = c(
-      y + height,
-      y - height,
-      y,
-      y,
-      y + errorbar_tip_size / 2,
-      y + errorbar_tip_size / 2,
-      y + height,
-      y - height
+    rlang::abort(
+      "`errorbar_tip_size` must be strictly positive.",
+      class = "ggbothbar_input_error"
     )
-  )
+  }
+
+  segments <- list()
+  if (height > 0) {
+    segments[[length(segments) + 1L]] <- data.frame(
+      x = x - errorbar_tip_size / 2,
+      xend = x + errorbar_tip_size / 2,
+      y = y + height,
+      yend = y + height
+    )
+    segments[[length(segments) + 1L]] <- data.frame(
+      x = x - errorbar_tip_size / 2,
+      xend = x + errorbar_tip_size / 2,
+      y = y - height,
+      yend = y - height
+    )
+    segments[[length(segments) + 1L]] <- data.frame(
+      x = x,
+      xend = x,
+      y = y - height,
+      yend = y + height
+    )
+  }
+  if (width > 0) {
+    segments[[length(segments) + 1L]] <- data.frame(
+      x = x - width,
+      xend = x + width,
+      y = y,
+      yend = y
+    )
+    segments[[length(segments) + 1L]] <- data.frame(
+      x = x - width,
+      xend = x - width,
+      y = y - errorbar_tip_size / 2,
+      yend = y + errorbar_tip_size / 2
+    )
+    segments[[length(segments) + 1L]] <- data.frame(
+      x = x + width,
+      xend = x + width,
+      y = y - errorbar_tip_size / 2,
+      yend = y + errorbar_tip_size / 2
+    )
+  }
+
+  if (length(segments) == 0L) {
+    return(data.frame(
+      x = numeric(),
+      xend = numeric(),
+      y = numeric(),
+      yend = numeric()
+    ))
+  }
+  do.call(rbind, segments)
 }
