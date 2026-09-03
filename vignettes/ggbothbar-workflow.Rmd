@@ -52,7 +52,7 @@ when replacing them is intentional.
 
 Map `group` explicitly so each biological group is summarised separately.
 `geom_errorbarb()` calculates the group mean and either standard deviation or
-standard error along both axes. Its cap width is a physical size in centimetres,
+standard error along both axes. Its cap width is a physical size in millimetres,
 so it remains visually stable when the plotting viewport changes.
 
 ```{r plot, fig.alt="Carbon and nitrogen enrichment means with two-axis standard errors"}
@@ -61,7 +61,7 @@ ggplot(
   aes(e13C, e15N, colour = type, group = type, label = type)
 ) +
   geom_point(alpha = 0.55) +
-  geom_errorbarb(fun.errorbar = "se", errorbar_tip_size = 0.2) +
+  geom_errorbarb(fun.errorbar = "se", errorbar_tip_size = 2) +
   stat_mean_point(size = 2.5) +
   stat_mean_label(
     geom = "text",

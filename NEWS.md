@@ -44,10 +44,10 @@
   valid one-axis interval when the other axis has zero variance, and honours
   `lineend`. Set `stat = "identity"` to draw precomputed `xmin`, `xmax`, `ymin`,
   and `ymax` endpoints.
-- Numeric `errorbar_tip_size` values are now interpreted correctly in
-  centimetres. The default changed from `2` to `0.2`, retaining an approximately
-  2 mm default cap. Explicit values now render ten times wider than under the
-  previous unit-conversion bug (#15).
+- Numeric `errorbar_tip_size` values are now documented in millimetres, matching
+  their historical rendered size. The default remains `2`, producing an
+  approximately 2 mm cap, and explicit numeric values retain their previous
+  physical width (#15).
 - `geom_errorbox()` now honours its `stat` argument and, like
   `geom_errorbarb()`, calculates summaries in the original data space before
   applying scale transformations.
