@@ -66,7 +66,7 @@ ggplot(
     position = position_nudge(x = 0.25, y = 0.2),
     show.legend = FALSE
   ) +
-  geom_errorbarb(fun.errorbar = "se", linewidth = 0.6, errorbar_tip_size = 0.2) +
+  geom_errorbarb(fun.errorbar = "se", linewidth = 0.6, errorbar_tip_size = 2) +
   scale_colour_brewer(palette = "Set1") +
   labs(x = label_isotope(13, "C"), y = label_isotope(15, "N"))
 ```

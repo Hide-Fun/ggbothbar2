@@ -14,9 +14,8 @@
 #' @param fun.errorbar Error calculation method, either `"sd"` or `"se"`.
 #' @param na.rm If `FALSE`, missing values are removed with a warning. If
 #'   `TRUE`, missing values are silently removed.
-#' @param errorbar_tip_size Error-bar tip width in centimeters. Defaults to
-#'   `0.2`, preserving the historical default appearance of approximately
-#'   2 mm while correcting the documented physical unit.
+#' @param errorbar_tip_size Error-bar tip width in millimeters. Defaults to
+#'   `2`, which produces an approximately 2 mm cap.
 #' @param lineend Line-end style: `"round"`, `"butt"`, or `"square"`.
 #' @param linewidth Width of lines.
 #' @param show.legend Logical. Should this layer be included in legends?
@@ -37,7 +36,7 @@ geom_errorbarb <- function(
   ...,
   fun.errorbar = "sd",
   na.rm = FALSE,
-  errorbar_tip_size = 0.2,
+  errorbar_tip_size = 2,
   lineend = "butt",
   linewidth = 0.5,
   show.legend = NA,
@@ -73,7 +72,7 @@ draw_errorbarb_row <- function(data, errorbar_tip_size, lineend) {
     lty = data$linetype,
     lineend = lineend
   )
-  tip <- grid::unit(errorbar_tip_size, "cm")
+  tip <- grid::unit(errorbar_tip_size, "mm")
   half_tip <- tip / 2
   children <- list()
 
@@ -133,7 +132,7 @@ Geomerrorbarb <- ggplot2::ggproto(
     panel_params,
     coord,
     na.rm = FALSE,
-    errorbar_tip_size = 0.2,
+    errorbar_tip_size = 2,
     lineend = "butt"
   ) {
     if (
@@ -143,7 +142,7 @@ Geomerrorbarb <- ggplot2::ggproto(
         errorbar_tip_size <= 0
     ) {
       rlang::abort(
-        "`errorbar_tip_size` must be one positive finite number in centimeters.",
+        "`errorbar_tip_size` must be one positive finite number in millimeters.",
         class = "ggbothbar_input_error"
       )
     }

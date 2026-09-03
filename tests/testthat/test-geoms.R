@@ -18,7 +18,7 @@ test_that("geom_errorbarb uses its summary stat by default", {
   layer <- geom_errorbarb()
 
   expect_true(inherits(layer$stat, "StatErrorbarb"))
-  expect_equal(layer$geom_params$errorbar_tip_size, 0.2)
+  expect_equal(layer$geom_params$errorbar_tip_size, 2)
 })
 
 test_that("geom_errorbarb computes uncertainty in original data space", {
@@ -176,7 +176,7 @@ test_that("the geom default cap is two millimeters", {
       linewidth = 0.5,
       linetype = 1
     )
-    grob <- ggbothbar:::draw_errorbarb_row(data, 0.2, "butt")
+    grob <- ggbothbar:::draw_errorbarb_row(data, 2, "butt")
     lower_cap <- grob$children[[2]]
     cap_width <- abs(grid::convertX(
       lower_cap$x1 - lower_cap$x0,
@@ -185,6 +185,32 @@ test_that("the geom default cap is two millimeters", {
     ))
 
     expect_equal(cap_width, 2, tolerance = 1e-6)
+  })
+})
+
+test_that("numeric errorbar tip sizes are interpreted as millimeters", {
+  with_temp_pdf_device({
+    data <- data.frame(
+      x = 0.5,
+      y = 0.5,
+      xmin = 0.4,
+      xmax = 0.6,
+      ymin = 0.4,
+      ymax = 0.6,
+      colour = "black",
+      alpha = NA_real_,
+      linewidth = 0.5,
+      linetype = 1
+    )
+    grob <- ggbothbar:::draw_errorbarb_row(data, 0.18, "butt")
+    lower_cap <- grob$children[[2]]
+    cap_width <- abs(grid::convertX(
+      lower_cap$x1 - lower_cap$x0,
+      "mm",
+      valueOnly = TRUE
+    ))
+
+    expect_equal(cap_width, 0.18, tolerance = 1e-6)
   })
 })
 

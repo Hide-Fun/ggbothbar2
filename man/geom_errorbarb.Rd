@@ -12,7 +12,7 @@ geom_errorbarb(
   ...,
   fun.errorbar = "sd",
   na.rm = FALSE,
-  errorbar_tip_size = 0.2,
+  errorbar_tip_size = 2,
   lineend = "butt",
   linewidth = 0.5,
   show.legend = NA,
@@ -37,9 +37,8 @@ endpoints.}
 \item{na.rm}{If \code{FALSE}, missing values are removed with a warning. If
 \code{TRUE}, missing values are silently removed.}
 
-\item{errorbar_tip_size}{Error-bar tip width in centimeters. Defaults to
-\code{0.2}, preserving the historical default appearance of approximately
-2 mm while correcting the documented physical unit.}
+\item{errorbar_tip_size}{Error-bar tip width in millimeters. Defaults to
+\code{2}, which produces an approximately 2 mm cap.}
 
 \item{lineend}{Line-end style: \code{"round"}, \code{"butt"}, or \code{"square"}.}
 

@@ -121,16 +121,18 @@ Acceptance criteria:
   the resulting coordinates for display.
 - Draw the valid direction when only one axis has non-zero variance.
 - Honor the public `lineend` argument.
-- Correct the cap-size unit conversion. Numeric `errorbar_tip_size` remains in
-  centimeters, while its default changes from `2` to `0.2` so that the current
-  default visual width remains approximately 2 mm.
-- Record the change to explicitly supplied cap sizes in NEWS and close
+- Correct the cap-size documentation. Numeric `errorbar_tip_size` remains in
+  millimeters and its default remains `2`, preserving the historical physical
+  width of both default and explicitly supplied values.
+- Record the clarified unit contract in NEWS and close
   [issue #15](https://github.com/Hide-Fun/ggbothbar/issues/15) only after the
   physical-unit regression test passes.
 
 Acceptance criteria:
 
-- A 0.18 cm cap measures 1.8 mm in the resulting grob.
+- A numeric cap size of 0.18 measures 0.18 mm in the resulting geom.
+- A low-level `grid::unit(0.18, "cm")` cap measures 1.8 mm in the resulting
+  grob.
 - The default cap retains its intentional approximately 2 mm appearance.
 - Summary values are independent of viewport dimensions.
 - A group with zero x variance and positive y variance still draws the y
